@@ -43,7 +43,7 @@ function respondError(errorCode, id, response) {
         },
         id: id
     };
-    response.write(JSON.stringify(resp));
+    response.end(JSON.stringify(resp));
 }
 
 function respondResult(result, id, response) {
@@ -52,7 +52,7 @@ function respondResult(result, id, response) {
         result: result,
         id: id
     };
-    response.write(JSON.stringify(resp));
+    response.end(JSON.stringify(resp));
 }
 
 RPCAPI.prototype.handleRequest = function(request, response) {
@@ -138,6 +138,7 @@ function RPCResponse(response, messageID) {
     this._response = response;
     this._messageID = messageID;
     this.keyVals = null;
+    this.resolved = false;
 }
 RPCResponse.prototype.set = function(name, value) {
     if (this.keyVals === null) {
@@ -152,9 +153,17 @@ RPCResponse.prototype.get = function(name) {
     return this.keyVals[name];
 };
 RPCResponse.prototype.resolve = function(result) {
+    if (this.resolved) {
+        throw new Error('Cannot call resolve twice on a RPCResponse');
+    }
+    this.resolved = true;
     respondResult(result, this._messageID, this._response);
 };
 RPCResponse.prototype.reject = function(errorCode, errorMessage) {
+    if (this.resolved) {
+        throw new Error('Cannot call resolve twice on a RPCResponse');
+    }
+    this.resolve = true;
     respondError(errorCode, this._messageID, this._response);
 };
 
