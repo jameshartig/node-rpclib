@@ -6,7 +6,7 @@ var RPC_ERROR_PARSE_ERROR = -32700,
     RPC_ERROR_INVALID_METHOD = -32601,
     RPC_ERROR_INVALID_PARAMS = -32602;
 
-debug = util.debuglog('hapnn-api');
+debug = util.debuglog('rpclib');
 
 function RPCAPI() {
     this.methods = {};
@@ -131,7 +131,7 @@ RPCAPI.prototype.handleRequest = function(request, response) {
         this.preProcessor(message, methodDetail, respObj);
     }
 
-    methodDetail.handler(params, response);
+    methodDetail.handler(params, respObj);
 };
 
 function RPCResponse(response, messageID) {
