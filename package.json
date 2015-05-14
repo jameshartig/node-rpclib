@@ -1,0 +1,27 @@
+{
+  "name": "rpclib",
+  "version": "0.0.1",
+  "description": "Library that simplifies building an JSON-RPC endpoint",
+  "main": "rpc.js",
+  "directories": {
+    "test": "tests"
+  },
+  "devDependencies": {
+    "nodeunit": "0.9.0"
+  },
+  "scripts": {
+    "test": "nodeunit tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/fastest963/node-rpclib.git"
+  },
+  "keywords": [
+    "rpc",
+    "jsonrpc",
+    "library"
+  ],
+  "author": "James Hartig <fastest963@gmail.com>",
+  "license": "MIT",
+  "readmeFilename": "README.md"
+}
