@@ -14,25 +14,30 @@ var RPCLib = require('rpclib');
 
 Creates a new RPC library instance. Should be done at application start up.
 
-### rpc.addMethod(name, handler[, params][, flags] ###
+### rpc.addMethod(name, handler[, params][, flags]) ###
 
-Adds a new handler for a method name. `handler` is a callback that is sent (requestObject, response) is
-called when a new request is made for this method. `params` should be a hash like this example:
+Adds a new handler for a method name. `handler` is a callback that is called with
+(requestObject, response) when a new request is made for this method name.
+`requestObject` is the request object sent from the client. `response` is an
+instance of `RPCResponse`.
+
+`params` should be a hash like this example:
 ```JS
 {
     email: {type: 'string', optional: false},
     password: {type: 'string', optional: false},
     name: {type: 'string', optional: false},
-    phoneNumber: {type: 'string', optional: true}
+    phone: {type: 'number', optional: true}
 }
 ```
 `flags` are completely optional and will be passed to your pre-processor(s).
 
 ### rpc.setPreProcessor(func) ###
 
-Sets the pre-processor, which is called before the handler but after the request is validated.
-The `func` is sent (requestObject, response, methodFlags). `reqObj` is the request object sent from the client.
-`response` is an instance of `RPCResponse`. `methodFlags` are the flags that were defined with the method.
+Sets the pre-processor, which is called before the handler but after the request is
+validated. The `func` is sent (requestObject, response, methodFlags). `requestObject`
+is the request object sent from the client. `response` is an instance of `RPCResponse`.
+`methodFlags` are the flags that were defined with the method.
 
 ### rpc.handleRequest(requestBody, serverResponse) ###
 
@@ -48,3 +53,12 @@ Resolves a request with the passed `result`.
 ### resp.reject(errorCode[, errorMessage]) ###
 
 Rejects a request and responds with an error object containing the passed code and message.
+
+### resp.set(name, value) ###
+
+Set arbitrary data on the response for later use in a post-processor, pre-processor or
+handler.
+
+### resp.get(name) ###
+
+Get arbitrary data that was previously stored with `set`.
