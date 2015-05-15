@@ -1,11 +1,5 @@
 var util = require('util'),
     debug;
-
-var RPC_ERROR_PARSE_ERROR = -32700,
-    RPC_ERROR_INVALID_REQUEST = -32600,
-    RPC_ERROR_INVALID_METHOD = -32601,
-    RPC_ERROR_INVALID_PARAMS = -32602;
-
 debug = util.debuglog('rpclib');
 
 function endResponse(respObj, response) {
@@ -18,6 +12,11 @@ function RPCAPI() {
     this.postProcessor = endResponse;
     this.addMethod('rpc.describe', this._describeSelfHandler.bind(this));
 }
+
+RPCAPI.ERROR_PARSE_ERROR = -32700;
+RPCAPI.ERROR_INVALID_REQUEST = -32600;
+RPCAPI.ERROR_INVALID_METHOD = -32601;
+RPCAPI.ERROR_INVALID_PARAMS = -32602;
 
 RPCAPI.prototype.addMethod = function(name, handler, params, flags) {
     var obj = null,
@@ -73,7 +72,7 @@ RPCAPI.prototype.handleRequest = function(requestBody, httpResponse) {
     } catch (ignore) {}
     if (message == null) {
         debug('Invalid JSON received');
-        (new RPCResponse(this, httpResponse)).reject(RPC_ERROR_PARSE_ERROR);
+        (new RPCResponse(this, httpResponse)).reject(RPCAPI.ERROR_PARSE_ERROR);
         return;
     }
     if (Array.isArray(message)) {
@@ -99,24 +98,24 @@ RPCAPI.prototype._processRequest = function(request, httpResponse) {
     }
     if (request.jsonrpc !== '2.0') {
         debug('Invalid jsonrpc value received');
-        response.reject(RPC_ERROR_INVALID_REQUEST);
+        response.reject(RPCAPI.ERROR_INVALID_REQUEST);
         return;
     }
     if (typeof request.method !== 'string') {
         debug('Invalid method value received');
-        response.reject(RPC_ERROR_INVALID_REQUEST);
+        response.reject(RPCAPI.ERROR_INVALID_REQUEST);
         return;
     }
     if (typeof request.params !== 'object') {
         debug('Invalid params value received');
-        response.reject(RPC_ERROR_INVALID_REQUEST);
+        response.reject(RPCAPI.ERROR_INVALID_REQUEST);
         return;
     }
 
     methodDetail = this.methods[request.method];
     if (methodDetail === undefined) {
         debug('Method', request.method, 'doesnt exist');
-        response.reject(RPC_ERROR_INVALID_METHOD);
+        response.reject(RPCAPI.ERROR_INVALID_METHOD);
         return false;
     }
     if (methodDetail.params !== undefined) {
@@ -125,7 +124,7 @@ RPCAPI.prototype._processRequest = function(request, httpResponse) {
             t = typeof request.params[k];
             if (v.type !== '*' && t !== v.type && (!v.optional || t !== 'undefined')) {
                 debug('Method', request.method, 'requires param', k, 'to be type', v);
-                response.reject(RPC_ERROR_INVALID_PARAMS);
+                response.reject(RPCAPI.ERROR_INVALID_PARAMS);
                 return;
             }
         }

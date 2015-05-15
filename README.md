@@ -64,3 +64,10 @@ handler.
 ### resp.get(name) ###
 
 Get arbitrary data that was previously stored with `set`.
+
+## Predefined Errors ##
+
+### RPCLib.ERROR_PARSE_ERROR ###
+### RPCLib.ERROR_INVALID_REQUEST ###
+### RPCLib.ERROR_INVALID_METHOD ###
+### RPCLib.ERROR_INVALID_PARAMS ###
