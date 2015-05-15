@@ -13,6 +13,15 @@ exports.addMethod = function(test) {
     test.done();
 };
 
+exports.addMethodOptions = function(test) {
+    var rpc = new RPCLib();
+    rpc.addMethod('test', {
+        handler: function(){}
+    });
+    test.ok(true);
+    test.done();
+};
+
 exports.handleTestRequest = function(test) {
     var rpc = new RPCLib(),
         called = false;
@@ -22,6 +31,24 @@ exports.handleTestRequest = function(test) {
         called = true;
     }, {
         test: {type: 'string', optional: false}
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {test: 'test'}, id: 1}));
+    test.ok(called);
+    test.done();
+};
+
+exports.handleTestRequestOptions = function(test) {
+    var rpc = new RPCLib(),
+        called = false;
+    rpc.addMethod('test', {
+        handler: function(params, response) {
+            test.equal(typeof params, 'object');
+            test.equal(params.test, 'test');
+            called = true;
+        },
+        params: {
+            test: {type: 'string', optional: false}
+        }
     });
     rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {test: 'test'}, id: 1}));
     test.ok(called);

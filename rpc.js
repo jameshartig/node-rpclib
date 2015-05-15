@@ -20,13 +20,25 @@ function RPCAPI() {
 }
 
 RPCAPI.prototype.addMethod = function(name, handler, params, flags) {
+    var obj = null,
+        description, errors;
+    if (typeof handler === 'object') {
+        obj = handler;
+        handler = obj.handler;
+        params = obj.params; //undefined ok
+        flags = obj.flags || 0;
+        description = obj.description;
+        errors = obj.errors;
+    }
     if (typeof handler !== 'function') {
         throw new TypeError('Invalid handler method sent to addMethod for ' + name);
     }
     this.methods[name] = {
         params: params,
         handler: handler,
-        flags: +flags
+        flags: +flags,
+        description: description,
+        errors: errors
     };
 };
 
