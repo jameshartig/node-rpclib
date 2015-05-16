@@ -6,7 +6,10 @@ debug = util.debuglog('rpclib');
 function RPCLib() {
     this.methods = {};
     this.preProcessor = null;
-    this.addMethod('rpc.describe', this._describeSelfHandler.bind(this));
+    this.addMethod('rpc.describe', {
+        handler: this._describeSelfHandler.bind(this),
+        internal: true
+    });
 }
 
 RPCLib.ERROR_PARSE_ERROR = -32700;
@@ -18,6 +21,7 @@ RPCLib.ERROR_SERVER_ERROR = -32000;
 
 RPCLib.prototype.addMethod = function(name, handler, params, flags) {
     var obj = null,
+        internal = false,
         description, errors;
     if (typeof handler === 'object') {
         obj = handler;
@@ -26,6 +30,7 @@ RPCLib.prototype.addMethod = function(name, handler, params, flags) {
         flags = obj.flags || 0;
         description = obj.description;
         errors = obj.errors;
+        internal = obj.internal;
     }
     if (typeof handler !== 'function') {
         throw new TypeError('Invalid handler method sent to addMethod for ' + name);
@@ -35,7 +40,8 @@ RPCLib.prototype.addMethod = function(name, handler, params, flags) {
         handler: handler,
         flags: +flags,
         description: description,
-        errors: errors
+        errors: errors,
+        internal: internal
     };
 };
 
@@ -57,7 +63,9 @@ RPCLib.prototype.handleRequest = function(requestBody, httpResponse) {
         responseGroup;
     try {
         message = JSON.parse(requestBody);
-    } catch (ignore) {}
+    } catch (e) {
+        debug('JSON Error', e);
+    }
     if (Array.isArray(message)) {
         responseGroup = new RPCResponseGroup(httpResponse);
         for (i = 0; i < message.length; i++) {
@@ -111,7 +119,7 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
         response.reject(RPCLib.ERROR_INVALID_REQUEST);
         return;
     }
-    if (typeof request.params !== 'object') {
+    if ((typeof request.params !== 'object' && request.params !== undefined) || request.params === null) {
         debug('Invalid params value received');
         response.reject(RPCLib.ERROR_INVALID_REQUEST);
         return;
@@ -137,13 +145,16 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
     }
 
     try {
-        if (this.preProcessor !== null) {
+        if (this.preProcessor !== null && methodDetail.internal !== true) {
+            debug('Calling preProcessor');
             this.preProcessor(request, response, methodDetail.flags);
             if (response.resolved) {
+                debug('preProcessor resolved response');
                 return;
             }
         }
 
+        debug('Calling handler for', request.method);
         methodDetail.handler(params, response);
     } catch (e) {
         response.reject(RPCLib.ERROR_INTERNAL_ERROR);
@@ -155,7 +166,14 @@ RPCLib.prototype._describeSelfHandler = function(req, response) {
     var result = {},
         n;
     for (n in this.methods) {
-        result[n] = this.methods[n].params || {};
+        if (this.methods[n].internal === true) {
+            continue;
+        }
+        result[n] = {
+            description: this.methods[n].description,
+            params: this.methods[n].params || {},
+            errors: this.methods[n].errors
+        };
     }
     response.resolve(result);
 };
@@ -178,7 +196,7 @@ function respondError(errorCode, errorMessage, id) {
 function respondResult(result, id) {
     var resp = {
         jsonrpc: '2.0',
-        result: result,
+        result: result || {},
         id: id
     };
     return resp;
@@ -234,11 +252,13 @@ RPCResponse.prototype.get = function(name) {
     return this.keyVals[name];
 };
 RPCResponse.prototype.resolve = function(result) {
+    debug('RPCResponse resolved');
     this.resolved = true;
     this.result = respondResult(result, this._messageID);
     callAlways(this);
 };
 RPCResponse.prototype.reject = function(errorCode, errorMessage) {
+    debug('RPCResponse rejected with code', errorCode);
     this.resolved = true;
     this.result = respondError(errorCode, errorMessage, this._messageID);
     callAlways(this);
@@ -259,6 +279,8 @@ function RPCResponseEnd(message) {
     if (!this._httpResponse || this._httpResponse.ended) {
         return;
     }
+    debug('Ending RPCResponse');
+    this._httpResponse.setHeader('Content-Type', 'application/json');
     if (message !== undefined) {
         if (typeof message !== 'string' && !Buffer.isBuffer(message)) {
             this._httpResponse.end(JSON.stringify(message));

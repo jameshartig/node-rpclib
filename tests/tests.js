@@ -93,6 +93,22 @@ exports.invalidJSON = function(test) {
     rpc.handleRequest('blahblahblah', {
         end: function() {
             called = true;
+        },
+        setHeader: function(){}
+    });
+    test.ok(called);
+    test.done();
+};
+
+exports.setHeaderToJSON = function(test) {
+    var rpc = new RPCLib(),
+        called = false;
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}), {
+        end: function() {},
+        setHeader: function(name, value) {
+            called = true;
+            test.equal(name, 'Content-Type');
+            test.equal(value, 'application/json');
         }
     });
     test.ok(called);
