@@ -1,24 +1,22 @@
 var util = require('util'),
+    assert = require('assert'),
     debug;
 debug = util.debuglog('rpclib');
 
-function endResponse(respObj, response) {
-    response.end(JSON.stringify(respObj));
-}
-
-function RPCAPI() {
+function RPCLib() {
     this.methods = {};
     this.preProcessor = null;
-    this.postProcessor = endResponse;
     this.addMethod('rpc.describe', this._describeSelfHandler.bind(this));
 }
 
-RPCAPI.ERROR_PARSE_ERROR = -32700;
-RPCAPI.ERROR_INVALID_REQUEST = -32600;
-RPCAPI.ERROR_INVALID_METHOD = -32601;
-RPCAPI.ERROR_INVALID_PARAMS = -32602;
+RPCLib.ERROR_PARSE_ERROR = -32700;
+RPCLib.ERROR_INVALID_REQUEST = -32600;
+RPCLib.ERROR_INVALID_METHOD = -32601;
+RPCLib.ERROR_INVALID_PARAMS = -32602;
+RPCLib.ERROR_INTERNAL_ERROR = -32603;
+RPCLib.ERROR_SERVER_ERROR = -32000;
 
-RPCAPI.prototype.addMethod = function(name, handler, params, flags) {
+RPCLib.prototype.addMethod = function(name, handler, params, flags) {
     var obj = null,
         description, errors;
     if (typeof handler === 'object') {
@@ -41,7 +39,7 @@ RPCAPI.prototype.addMethod = function(name, handler, params, flags) {
     };
 };
 
-RPCAPI.prototype.setPreProcessor = function(func) {
+RPCLib.prototype.setPreProcessor = function(func) {
     if (func === null) {
         this.preProcessor = null;
         return;
@@ -52,70 +50,77 @@ RPCAPI.prototype.setPreProcessor = function(func) {
     this.preProcessor = func;
 };
 
-RPCAPI.prototype.setPostProcessor = function(func) {
-    if (func === null) {
-        this.postProcessor = null;
-        return;
-    }
-    if (typeof func !== 'function') {
-        throw new TypeError('Invalid function sent to setPostProcessor');
-    }
-    this.postProcessor = func;
-};
-
-RPCAPI.prototype.handleRequest = function(requestBody, httpResponse) {
+RPCLib.prototype.handleRequest = function(requestBody, httpResponse) {
     debug('handleRequest');
     var message = null,
-        i = 0;
+        i = 0,
+        responseGroup;
     try {
         message = JSON.parse(requestBody);
     } catch (ignore) {}
-    if (message == null) {
-        debug('Invalid JSON received');
-        (new RPCResponse(this, httpResponse)).reject(RPCAPI.ERROR_PARSE_ERROR);
-        return;
-    }
     if (Array.isArray(message)) {
+        responseGroup = new RPCResponseGroup(httpResponse);
         for (i = 0; i < message.length; i++) {
-            this._processRequest(message[i], httpResponse);
+            this._processRequest(message[i], httpResponse, responseGroup);
         }
     } else {
         this._processRequest(message, httpResponse);
     }
 };
 
-RPCAPI.prototype._processRequest = function(request, httpResponse) {
-    var response = new RPCResponse(this, httpResponse),
+function endResponse(respObj, response) {
+    if (response.get('silent')) {
+        response.end('');
+    } else {
+        response.end(JSON.stringify(respObj));
+    }
+    return respObj;
+}
+
+RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup) {
+    var response = new RPCResponse(httpResponse),
         methodDetail = null,
         k = '',
         v = '',
         t = '',
         params = null;
+
+    response.always(endResponse.bind(this));
+    if (responseGroup) {
+        responseGroup.add(response);
+    }
+
+    if (typeof request !== 'object' || request === null) {
+        debug('Invalid json received');
+        response.reject(RPCLib.ERROR_PARSE_ERROR);
+        return;
+    }
+
     if (request.id === undefined) {
-        response._setSilence(true);
+        response.set('silent', true);
     } else {
         response._setMessageID(request.id);
     }
     if (request.jsonrpc !== '2.0') {
         debug('Invalid jsonrpc value received');
-        response.reject(RPCAPI.ERROR_INVALID_REQUEST);
+        response.reject(RPCLib.ERROR_INVALID_REQUEST);
         return;
     }
     if (typeof request.method !== 'string') {
         debug('Invalid method value received');
-        response.reject(RPCAPI.ERROR_INVALID_REQUEST);
+        response.reject(RPCLib.ERROR_INVALID_REQUEST);
         return;
     }
     if (typeof request.params !== 'object') {
         debug('Invalid params value received');
-        response.reject(RPCAPI.ERROR_INVALID_REQUEST);
+        response.reject(RPCLib.ERROR_INVALID_REQUEST);
         return;
     }
 
     methodDetail = this.methods[request.method];
     if (methodDetail === undefined) {
         debug('Method', request.method, 'doesnt exist');
-        response.reject(RPCAPI.ERROR_INVALID_METHOD);
+        response.reject(RPCLib.ERROR_INVALID_METHOD);
         return false;
     }
     if (methodDetail.params !== undefined) {
@@ -124,24 +129,29 @@ RPCAPI.prototype._processRequest = function(request, httpResponse) {
             t = typeof request.params[k];
             if (v.type !== '*' && t !== v.type && (!v.optional || t !== 'undefined')) {
                 debug('Method', request.method, 'requires param', k, 'to be type', v);
-                response.reject(RPCAPI.ERROR_INVALID_PARAMS);
+                response.reject(RPCLib.ERROR_INVALID_PARAMS);
                 return;
             }
         }
         params = request.params;
     }
 
-    if (this.preProcessor !== null) {
-        this.preProcessor(request, response, methodDetail.flags);
-        if (response.resolved) {
-            return;
+    try {
+        if (this.preProcessor !== null) {
+            this.preProcessor(request, response, methodDetail.flags);
+            if (response.resolved) {
+                return;
+            }
         }
-    }
 
-    methodDetail.handler(params, response);
+        methodDetail.handler(params, response);
+    } catch (e) {
+        response.reject(RPCLib.ERROR_INTERNAL_ERROR);
+        throw e;
+    }
 };
 
-RPCAPI.prototype._describeSelfHandler = function(req, response) {
+RPCLib.prototype._describeSelfHandler = function(req, response) {
     var result = {},
         n;
     for (n in this.methods) {
@@ -174,17 +184,40 @@ function respondResult(result, id) {
     return resp;
 }
 
-function RPCResponse(rpc, response) {
-    this._rpc = rpc;
-    this._response = response;
+function callAlways(response) {
+    if (response._alwaysCallbacks === null) {
+        return;
+    }
+    var callbacks = response._alwaysCallbacks,
+        i, arr, cb;
+    //always make sure the callbacks are null otherwise we might infinite loop
+    response._alwaysCallbacks = null;
+    try {
+        if (Array.isArray(callbacks)) {
+            for (i = 0; i < callbacks.length; i++) {
+                response.result = callbacks[i](response.result, response);
+            }
+        } else {
+            response.result = callbacks(response.result, response);
+        }
+    } catch (e) {
+        if (response.get('silent')) {
+            response.end('');
+        } else {
+            response.end(JSON.stringify(response.reject(RPCLib.ERROR_INTERNAL_ERROR)));
+        }
+        throw e;
+    }
+}
+
+function RPCResponse(httpResponse) {
+    this._httpResponse = httpResponse;
     this._messageID = null;
+    this._alwaysCallbacks = null;
     this.keyVals = null;
     this.resolved = false;
-    this._silent = false;
+    this.result = null;
 }
-RPCResponse.prototype._setSilence = function(silent) {
-    this._silent = !!silent;
-};
 RPCResponse.prototype._setMessageID = function(id) {
     this._messageID = id;
 };
@@ -201,31 +234,67 @@ RPCResponse.prototype.get = function(name) {
     return this.keyVals[name];
 };
 RPCResponse.prototype.resolve = function(result) {
-    if (this.resolved) {
-        throw new Error('Cannot call resolve twice on a RPCResponse');
-    }
     this.resolved = true;
-    var resp = respondResult(result, this._messageID);
-    if (this._rpc.postProcessor != null) {
-        this._rpc.postProcessor(resp, this);
-    }
+    this.result = respondResult(result, this._messageID);
+    callAlways(this);
 };
 RPCResponse.prototype.reject = function(errorCode, errorMessage) {
-    if (this.resolved) {
-        throw new Error('Cannot call resolve twice on a RPCResponse');
+    this.resolved = true;
+    this.result = respondError(errorCode, errorMessage, this._messageID);
+    callAlways(this);
+};
+RPCResponse.prototype.always = function(func) {
+    if (typeof func !== 'function') {
+        throw new TypeError('param passed to always is not a function');
     }
-    this.resolve = true;
-    var resp = respondError(errorCode, errorMessage, this._messageID);
-    if (this._rpc.postProcessor != null) {
-        this._rpc.postProcessor(resp, this);
+    if (this._alwaysCallbacks === null) {
+        this._alwaysCallbacks = func;
+    } else if (Array.isArray(this._alwaysCallbacks)) {
+        this._alwaysCallbacks.push(func);
+    } else {
+        this._alwaysCallbacks = [this._alwaysCallbacks, func];
     }
 };
-RPCResponse.prototype.end = function(message) {
-    if (this._silent) {
-        this._response.end();
+function RPCResponseEnd(message) {
+    if (!this._httpResponse || this._httpResponse.ended) {
         return;
     }
-    this._response.end(message);
-};
+    if (message !== undefined) {
+        if (typeof message !== 'string' && !Buffer.isBuffer(message)) {
+            this._httpResponse.end(JSON.stringify(message));
+        } else {
+            this._httpResponse.end(message);
+        }
+    } else {
+        this._httpResponse.end(JSON.stringify(this.result));
+    }
+}
+RPCResponse.prototype.end = RPCResponseEnd;
 
-module.exports = RPCAPI;
+function RPCResponseGroup(httpResponse) {
+    this._httpResponse = httpResponse;
+    this.ended = false;
+    this.responses = [];
+    this.results = [];
+    this._resolvedCount = 0;
+}
+RPCResponseGroup.prototype.add = function(response, rpc) {
+    var f = function(respObj, response) {
+            if (!response.get('silent')) {
+                this.results.push(JSON.stringify(respObj));
+            }
+            this._resolvedCount++;
+            if (this._resolvedCount >= this.responses.length) {
+                assert.notEqual(this.ended, true);
+                this.ended = true;
+                this.end();
+            }
+        };
+    //clear out _httpResponse so end() doesn't end on it
+    response._httpResponse = null;
+    response.always(f.bind(this));
+};
+RPCResponseGroup.prototype.end = RPCResponseEnd;
+
+
+module.exports = RPCLib;

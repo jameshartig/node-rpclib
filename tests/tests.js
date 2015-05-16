@@ -87,26 +87,14 @@ exports.preProcessor = function(test) {
     test.done();
 };
 
-exports.postProcessor = function(test) {
+exports.invalidJSON = function(test) {
     var rpc = new RPCLib(),
         called = false;
-    rpc.setPostProcessor(function(result, resppnse) {
-        test.equal(typeof result.error, 'object');
-        called = true;
+    rpc.handleRequest('blahblahblah', {
+        end: function() {
+            called = true;
+        }
     });
-    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'blah', params: {}, id: 1}));
-    test.ok(called);
-    test.done();
-};
-
-exports.invalidMethodError = function(test) {
-    var rpc = new RPCLib(),
-        called = false;
-    rpc.setPostProcessor(function(result, resppnse) {
-        test.strictEqual(result.error.code, -32601);
-        called = true;
-    });
-    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'blah', params: {}, id: 1}));
     test.ok(called);
     test.done();
 };

@@ -19,8 +19,8 @@ Creates a new RPC library instance. Should be done at application start up.
 
 Adds a new handler for a method name. `options` should be an object that has
 `handler`, `params`, and `flags`, as keys. `handler` is a callback that is
-called with (requestObject, response) when a new request is made for this method
-name. `requestObject` is the request object sent from the client. `response` is an
+called with (params, response) when a new request is made for this method
+name. `params` is the params object sent from the client. `response` is an
 instance of `RPCResponse`.
 
 `params` should be a hash like this example:
