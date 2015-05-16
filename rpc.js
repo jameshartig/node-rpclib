@@ -1,5 +1,7 @@
 var util = require('util'),
     assert = require('assert'),
+    http = require('http'),
+    url = require('url'),
     debug;
 debug = util.debuglog('rpclib');
 
@@ -318,5 +320,83 @@ RPCResponseGroup.prototype.add = function(response, rpc) {
 };
 RPCResponseGroup.prototype.end = RPCResponseEnd;
 
+function RPCClient(endpoint) {
+    debug('Creating RPCClient for', endpoint);
+    this.url = url.parse(endpoint);
+    if (!this.url || !this.url.host) {
+        throw new TypeError('Invalid url sent to RPCClient');
+    }
+}
+RPCClient.prototype.call = function(name, params, cb) {
+    if (typeof params === 'function') {
+        cb = params;
+        params = null;
+    }
+    if (typeof cb !== 'function') {
+        throw new TypeError('callback sent to RPCClient.call must be a function');
+    }
+
+    debug('call method:', name);
+    var postData = JSON.stringify({
+            jsonrpc: '2.0',
+            method: name,
+            params: params || {},
+            id: Date.now()
+        }),
+        reqOptions = {
+            hostname: this.url.hostname,
+            port: this.url.port || (this.url.protocol === 'https' ? '443' : '80'),
+            path: this.url.path || '/',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': postData.length
+            }
+        },
+        resolve = function(err, res) {
+            if (cb === null) {
+                return;
+            }
+            cb(err, res);
+            cb = null;
+        },
+        req;
+
+    req = http.request(reqOptions, function(result) {
+        debug('Received result for call', result.statusCode);
+        //todo: can we get multiple 'data' events that we need to concat?
+        result.once('data', function(data) {
+            var rpcResult = null;
+            try {
+                rpcResult = JSON.parse(data);
+                resolve(rpcResult.error || null, rpcResult.result || null);
+            } catch (ignore) {
+                resolve({
+                    statusCode: result.statusCode,
+                    code: RPCLib.ERROR_SERVER_ERROR,
+                    message: 'Server returned invalid JSON'
+                }, null);
+            }
+        });
+        result.once('close', function() {
+            resolve({
+                statusCode: result.statusCode,
+                code: RPCLib.ERROR_SERVER_ERROR,
+                message: 'Server returned no body'
+            }, null);
+        });
+    });
+    req.on('error', function(err) {
+        resolve({
+            socketError: err,
+            code: 0,
+            message: 'Failed to reach server'
+        }, null);
+    });
+    req.write(postData);
+    req.end();
+};
+
+RPCLib.RPCClient = RPCClient;
 
 module.exports = RPCLib;
