@@ -46,7 +46,7 @@ is the request object sent from the client. `response` is an instance of `RPCRes
 Handles a request from a client. `requestBody` should the body of the request made and
 `serverResponse` should be an instance of `http.ServerResponse`.
 
-### RPCResponse Methods ###
+## RPCResponse Methods ##
 
 ### resp.resolve(result) ###
 
@@ -71,3 +71,24 @@ Get arbitrary data that was previously stored with `set`.
 ### RPCLib.ERROR_INVALID_REQUEST ###
 ### RPCLib.ERROR_INVALID_METHOD ###
 ### RPCLib.ERROR_INVALID_PARAMS ###
+
+## RPCClient Methods ##
+
+### Usage ###
+
+```JS
+var RPCClient = require('rpclib').RPCCLient;
+```
+
+### client = new RPCClient([endpoint]) ###
+
+Creates a new RPC client instance. `endpoint` should be a url.
+
+### client.setEndpoint(endpoint) ###
+
+`endpoint` should be a url.
+
+### client.call(name, params, callback) ###
+### client.call(name, callback) ###
+
+Call an RPC method named `name` with `params`. `callback` will be called with `(err, result)`.

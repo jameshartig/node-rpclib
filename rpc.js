@@ -321,12 +321,19 @@ RPCResponseGroup.prototype.add = function(response, rpc) {
 RPCResponseGroup.prototype.end = RPCResponseEnd;
 
 function RPCClient(endpoint) {
-    debug('Creating RPCClient for', endpoint);
+    if (endpoint) {
+        this.setEndpoint(endpoint);
+    } else {
+        this.url = null;
+    }
+}
+RPCClient.prototype.setEndpoint = function(endpoint) {
+    debug('setEndpoint', endpoint);
     this.url = url.parse(endpoint);
     if (!this.url || !this.url.host) {
         throw new TypeError('Invalid url sent to RPCClient');
     }
-}
+};
 RPCClient.prototype.call = function(name, params, cb) {
     if (typeof params === 'function') {
         cb = params;
@@ -334,6 +341,9 @@ RPCClient.prototype.call = function(name, params, cb) {
     }
     if (typeof cb !== 'function') {
         throw new TypeError('callback sent to RPCClient.call must be a function');
+    }
+    if (this.url === null) {
+        throw new TypeError('RPC endpoint not defined. Must call setEndpoint or sent endpoint to constructor');
     }
 
     debug('call method:', name);
@@ -372,6 +382,7 @@ RPCClient.prototype.call = function(name, params, cb) {
                 resolve(rpcResult.error || null, rpcResult.result || null);
             } catch (ignore) {
                 resolve({
+                    type: 'json',
                     statusCode: result.statusCode,
                     code: RPCLib.ERROR_SERVER_ERROR,
                     message: 'Server returned invalid JSON'
@@ -380,6 +391,7 @@ RPCClient.prototype.call = function(name, params, cb) {
         });
         result.once('close', function() {
             resolve({
+                type: 'http',
                 statusCode: result.statusCode,
                 code: RPCLib.ERROR_SERVER_ERROR,
                 message: 'Server returned no body'
@@ -388,6 +400,7 @@ RPCClient.prototype.call = function(name, params, cb) {
     });
     req.on('error', function(err) {
         resolve({
+            type: 'http',
             socketError: err,
             code: 0,
             message: 'Failed to reach server'
@@ -398,5 +411,6 @@ RPCClient.prototype.call = function(name, params, cb) {
 };
 
 RPCLib.RPCClient = RPCClient;
+RPCLib.Client = RPCClient;
 
 module.exports = RPCLib;
