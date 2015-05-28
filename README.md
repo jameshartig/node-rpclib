@@ -71,6 +71,8 @@ Get arbitrary data that was previously stored with `set`.
 ### RPCLib.ERROR_INVALID_REQUEST ###
 ### RPCLib.ERROR_INVALID_METHOD ###
 ### RPCLib.ERROR_INVALID_PARAMS ###
+### RPCLib.ERROR_INTERNAL_ERROR ###
+### RPCLib.ERROR_SERVER_ERROR ###
 
 ## RPCClient Methods ##
 
