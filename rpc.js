@@ -21,6 +21,15 @@ RPCLib.ERROR_INVALID_PARAMS = -32602;
 RPCLib.ERROR_INTERNAL_ERROR = -32603;
 RPCLib.ERROR_SERVER_ERROR = -32000;
 
+var PREDEFINED_ERROR_MESSAGES = {
+    '-32700': 'Parse error',
+    '-32600': 'Invalid Request',
+    '-32601': 'Method not found',
+    '-32602': 'Invalid params',
+    '-32603': 'Internal error',
+    '-32000': 'Server error'
+};
+
 RPCLib.prototype.addMethod = function(name, handler, params, flags) {
     var obj = null,
         internal = false,
@@ -78,11 +87,27 @@ RPCLib.prototype.handleRequest = function(requestBody, httpResponse) {
     }
 };
 
+RPCLib.prototype.call = function(name, params, callback) {
+    if (typeof params === 'function') {
+        callback = params;
+        params = null;
+    }
+    if (typeof callback !== 'function') {
+        throw new TypeError('callback sent to RPCLib.call must be a function');
+    }
+    this._processRequest({
+        jsonrpc: '2.0',
+        method: name,
+        params: params || {},
+        id: 1
+    }, callback);
+};
+
 function endResponse(respObj, response) {
     if (response.get('silent')) {
         response.end('');
     } else {
-        response.end(JSON.stringify(respObj));
+        response.end(respObj);
     }
     return respObj;
 }
@@ -95,7 +120,7 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
         t = '',
         params = null;
 
-    response.always(endResponse.bind(this));
+    response.always(endResponse);
     if (responseGroup) {
         responseGroup.add(response);
     }
@@ -185,13 +210,11 @@ function respondError(errorCode, errorMessage, id) {
     var resp = {
         jsonrpc: '2.0',
         error: {
-            code: errorCode
+            code: errorCode,
+            message: errorMessage || PREDEFINED_ERROR_MESSAGES[errorCode]
         },
         id: id
     };
-    if (errorMessage !== undefined) {
-        resp.error.message = errorMessage;
-    }
     return resp;
 }
 
@@ -231,7 +254,19 @@ function callAlways(response) {
 }
 
 function RPCResponse(httpResponse) {
-    this._httpResponse = httpResponse;
+    if (typeof httpResponse === 'function') {
+        this._httpResponse = {
+            end: function(result) {
+                this.ended = true;
+                httpResponse(result);
+            },
+            ended: false
+        };
+        this._rawResult = true;
+    } else {
+        this._httpResponse = httpResponse;
+        this._rawResult = false;
+    }
     this._messageID = null;
     this._alwaysCallbacks = null;
     this.keyVals = null;
@@ -265,6 +300,7 @@ RPCResponse.prototype.reject = function(errorCode, errorMessage) {
     this.result = respondError(errorCode, errorMessage, this._messageID);
     callAlways(this);
 };
+//with how early endResponse is added, this method is really useless for anything else
 RPCResponse.prototype.always = function(func) {
     if (typeof func !== 'function') {
         throw new TypeError('param passed to always is not a function');
@@ -282,19 +318,24 @@ function RPCResponseEnd(message) {
         return;
     }
     debug('Ending RPCResponse');
-    this._httpResponse.setHeader('Content-Type', 'application/json');
+    var response = null;
+    if (typeof this._httpResponse.setHeader === 'function') {
+        this._httpResponse.setHeader('Content-Type', 'application/json');
+    }
     if (message !== undefined) {
         if (typeof message !== 'string' && !Buffer.isBuffer(message)) {
-            this._httpResponse.end(JSON.stringify(message));
-        } else {
-            this._httpResponse.end(message);
+            response = this._rawResult ? message : JSON.stringify(message);
+        } else if (message.length > 0) {
+            response = message;
         }
     } else {
-        this._httpResponse.end(JSON.stringify(this.result));
+        response = this._rawResult ? this.result : JSON.stringify(this.result);
     }
+    this._httpResponse.end(response);
 }
 RPCResponse.prototype.end = RPCResponseEnd;
 
+//note: RPCResponseGroup does NOT support httpResponse being a function
 function RPCResponseGroup(httpResponse) {
     this._httpResponse = httpResponse;
     this.ended = false;
@@ -334,12 +375,12 @@ RPCClient.prototype.setEndpoint = function(endpoint) {
         throw new TypeError('Invalid url sent to RPCClient');
     }
 };
-RPCClient.prototype.call = function(name, params, cb) {
+RPCClient.prototype.call = function(name, params, callback) {
     if (typeof params === 'function') {
-        cb = params;
+        callback = params;
         params = null;
     }
-    if (typeof cb !== 'function') {
+    if (typeof callback !== 'function') {
         throw new TypeError('callback sent to RPCClient.call must be a function');
     }
     if (this.url === null) {
@@ -364,11 +405,11 @@ RPCClient.prototype.call = function(name, params, cb) {
             }
         },
         resolve = function(err, res) {
-            if (cb === null) {
+            if (callback === null) {
                 return;
             }
-            cb(err, res);
-            cb = null;
+            callback(err, res);
+            callback = null;
         },
         req;
 

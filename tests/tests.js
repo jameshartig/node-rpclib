@@ -24,16 +24,26 @@ exports.addMethodOptions = function(test) {
 
 exports.handleTestRequest = function(test) {
     var rpc = new RPCLib(),
-        called = false;
+        called = false,
+        ended = false;
     rpc.addMethod('test', function(params, response) {
         test.equal(typeof params, 'object');
         test.equal(params.test, 'test');
         called = true;
+        response.resolve({success: true});
     }, {
         test: {type: 'string', optional: false}
     });
-    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {test: 'test'}, id: 1}));
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {test: 'test'}, id: 1}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', result: {success: true}, id: 1}));
+            this.ended = true;
+            ended = true;
+        },
+        ended: false
+    });
     test.ok(called);
+    test.ok(ended);
     test.done();
 };
 
@@ -89,14 +99,16 @@ exports.preProcessor = function(test) {
 
 exports.invalidJSON = function(test) {
     var rpc = new RPCLib(),
-        called = false;
+        ended = false;
     rpc.handleRequest('blahblahblah', {
-        end: function() {
-            called = true;
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: -32700, message: 'Parse error'}, id: null}));
+            this.ended = true;
+            ended = true;
         },
-        setHeader: function(){}
+        ended: false
     });
-    test.ok(called);
+    test.ok(ended);
     test.done();
 };
 
@@ -104,12 +116,51 @@ exports.setHeaderToJSON = function(test) {
     var rpc = new RPCLib(),
         called = false;
     rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}), {
-        end: function() {},
+        end: function() {
+            this.ended = true;
+        },
         setHeader: function(name, value) {
             called = true;
             test.equal(name, 'Content-Type');
             test.equal(value, 'application/json');
-        }
+        },
+        ended: false
+    });
+    test.ok(called);
+    test.done();
+};
+
+exports.callTest = function(test) {
+    var rpc = new RPCLib(),
+        called = false;
+    rpc.addMethod('test', function(params, response) {
+        test.equal(typeof params, 'object');
+        test.equal(params.test, 'test');
+        response.resolve({success: true});
+    }, {
+        test: {type: 'string', optional: false}
+    });
+    rpc.call('test', {test: 'test'}, function(result) {
+        test.notEqual(result.result, null);
+        test.equal(result.result && result.result.success, true);
+        called = true;
+    });
+    test.ok(called);
+    test.done();
+};
+
+exports.callTestInvalidParams = function(test) {
+    var rpc = new RPCLib(),
+        called = false;
+    rpc.addMethod('test', function(params, response) {
+        test.fail();
+    }, {
+        test: {type: 'string', optional: false}
+    });
+    rpc.call('test', function(result) {
+        test.notEqual(result.error, null);
+        test.strictEqual(result.error && result.error.code, -32602);
+        called = true;
     });
     test.ok(called);
     test.done();
