@@ -1,4 +1,5 @@
-var RPCLib = require('../rpc.js');
+var Deferred = require('deferred'),
+    RPCLib = require('../rpc.js');
 
 exports.createRPC = function(test) {
     var rpc = new RPCLib();
@@ -19,6 +20,36 @@ exports.addMethodOptions = function(test) {
         handler: function(){}
     });
     test.ok(true);
+    test.done();
+};
+
+exports.addMethodInvalidParams = function(test) {
+    test.expect(1);
+    var rpc = new RPCLib();
+    test.throws(function() {
+        rpc.addMethod('test', {
+            handler: function() {
+            },
+            params: {
+                test: null
+            }
+        });
+    });
+    test.done();
+};
+
+exports.addMethodStringParam = function(test) {
+    test.expect(1);
+    var rpc = new RPCLib();
+    rpc.addMethod('test', {
+        handler: function(params) {
+            test.equal(typeof params.test, 'string');
+        },
+        params: {
+            test: 'string'
+        }
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {test: 'test'}, id: 1}));
     test.done();
 };
 
@@ -94,6 +125,54 @@ exports.preProcessor = function(test) {
     });
     rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}));
     test.ok(called);
+    test.done();
+};
+
+exports.preProcessorResolved = function(test) {
+    var rpc = new RPCLib(),
+        called = false;
+    rpc.addMethod('test', function() {
+        called = true;
+    });
+    rpc.setPreProcessor(function(req, resp) {
+        resp.resolve();
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}));
+    test.equal(called, false);
+    test.done();
+};
+
+exports.preProcessorDeferred = function(test) {
+    var rpc = new RPCLib(),
+        dfd = new Deferred(),
+        called = false;
+    rpc.addMethod('test', function() {
+        called = true;
+    });
+    rpc.setPreProcessor(function() {
+        return dfd.promise;
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}));
+    test.equal(called, false);
+    dfd.resolve();
+    test.equal(called, true);
+    test.done();
+};
+
+exports.preProcessorResolvedDeferred = function(test) {
+    var rpc = new RPCLib(),
+        dfd = new Deferred(),
+        called = false;
+    rpc.addMethod('test', function() {
+        called = true;
+    });
+    rpc.setPreProcessor(function(req, resp) {
+        resp.resolve();
+        return dfd.promise;
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}));
+    dfd.resolve();
+    test.equal(called, false);
     test.done();
 };
 

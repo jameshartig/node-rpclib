@@ -2,6 +2,7 @@ var util = require('util'),
     assert = require('assert'),
     http = require('http'),
     url = require('url'),
+    _EMPTY_OBJECT_ = {},
     debug;
 debug = util.debuglog('rpclib');
 
@@ -33,7 +34,7 @@ var PREDEFINED_ERROR_MESSAGES = {
 RPCLib.prototype.addMethod = function(name, handler, params, flags) {
     var obj = null,
         internal = false,
-        description, errors;
+        description, errors, n;
     if (typeof handler === 'object') {
         obj = handler;
         handler = obj.handler;
@@ -45,6 +46,23 @@ RPCLib.prototype.addMethod = function(name, handler, params, flags) {
     }
     if (typeof handler !== 'function') {
         throw new TypeError('Invalid handler method sent to addMethod for ' + name);
+    }
+    if (typeof params !== 'object' || params === null) {
+        params = _EMPTY_OBJECT_;
+    } else {
+        for (n in params) {
+            if (!params.hasOwnProperty(n)) {
+                continue;
+            }
+            if (typeof params[n] === 'string') {
+                params[n] = {
+                    type: params[n],
+                    optional: false
+                };
+            } else if (!params[n]) {
+                throw new TypeError('Invalid param sent to addMethod for param ' + n);
+            }
+        }
     }
     this.methods[name] = {
         params: params,
@@ -112,13 +130,19 @@ function endResponse(respObj, response) {
     return respObj;
 }
 
+function callHandler(handler, params, response, request) {
+    debug('Calling handler for', request.method);
+    handler(params, response);
+}
+
 RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup) {
     var response = new RPCResponse(httpResponse),
         methodDetail = null,
         k = '',
         v = '',
         t = '',
-        params = null;
+        params = null,
+        dfd = null;
 
     response.always(endResponse);
     if (responseGroup) {
@@ -158,31 +182,42 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
         response.reject(RPCLib.ERROR_INVALID_METHOD);
         return false;
     }
-    if (methodDetail.params !== undefined) {
-        for (k in methodDetail.params) {
-            v = methodDetail.params[k];
-            t = typeof request.params[k];
-            if (v.type !== '*' && t !== v.type && (!v.optional || t !== 'undefined')) {
-                debug('Method', request.method, 'requires param', k, 'to be type', v);
-                response.reject(RPCLib.ERROR_INVALID_PARAMS);
-                return;
-            }
+    for (k in methodDetail.params) {
+        if (!methodDetail.params.hasOwnProperty(k)) {
+            continue;
         }
-        params = request.params;
+        v = methodDetail.params[k];
+        t = typeof request.params[k];
+        if (v.type !== '*' && t !== v.type && (!v.optional || t !== 'undefined')) {
+            debug('Method', request.method, 'requires param', k, 'to be type', v);
+            response.reject(RPCLib.ERROR_INVALID_PARAMS);
+            return;
+        }
     }
+    params = request.params;
 
     try {
         if (this.preProcessor !== null && methodDetail.internal !== true) {
             debug('Calling preProcessor');
-            this.preProcessor(request, response, methodDetail.flags);
+            dfd = this.preProcessor(request, response, methodDetail.flags);
+            //if they returned a dfd wait until its done before calling handler
+            if (dfd && typeof dfd.then === 'function') {
+                dfd.then(function() {
+                    if (response.resolved) {
+                        debug('preProcessor resolved response');
+                        return;
+                    }
+                    callHandler(methodDetail.handler, params, response, request);
+                });
+                return;
+            }
             if (response.resolved) {
                 debug('preProcessor resolved response');
                 return;
             }
         }
 
-        debug('Calling handler for', request.method);
-        methodDetail.handler(params, response);
+        callHandler(methodDetail.handler, params, response, request);
     } catch (e) {
         response.reject(RPCLib.ERROR_INTERNAL_ERROR);
         throw e;
@@ -193,7 +228,7 @@ RPCLib.prototype._describeSelfHandler = function(req, response) {
     var result = {},
         n;
     for (n in this.methods) {
-        if (this.methods[n].internal === true) {
+        if (!this.methods.hasOwnProperty(n) || this.methods[n].internal === true) {
             continue;
         }
         result[n] = {
