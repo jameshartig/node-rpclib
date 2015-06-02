@@ -78,6 +78,66 @@ exports.handleTestRequest = function(test) {
     test.done();
 };
 
+exports.handleTestRequestReject = function(test) {
+    var rpc = new RPCLib(),
+        ended = false;
+    rpc.addMethod('test', function(params, response) {
+        response.reject(1);
+    }, {
+        test: {type: 'string', optional: false}
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {test: 'test'}, id: 1}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: 1}, id: 1}));
+            this.ended = true;
+            ended = true;
+        },
+        ended: false
+    });
+    test.ok(ended);
+    test.done();
+};
+
+exports.handleTestRequestRejectMessage = function(test) {
+    var rpc = new RPCLib(),
+        ended = false;
+    rpc.addMethod('test', function(params, response) {
+        response.reject(1, 'Test');
+    }, {
+        test: {type: 'string', optional: false}
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {test: 'test'}, id: 1}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: 1, message: 'Test'}, id: 1}));
+            this.ended = true;
+            ended = true;
+        },
+        ended: false
+    });
+    test.ok(ended);
+    test.done();
+};
+
+exports.handleTestRequestRejectData = function(test) {
+    var rpc = new RPCLib(),
+        ended = false;
+    rpc.addMethod('test', function(params, response) {
+        response.reject(1, 'Test', {extra: true});
+    }, {
+        test: {type: 'string', optional: false}
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {test: 'test'}, id: 1}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: 1, message: 'Test', data: {extra: true}}, id: 1}));
+            this.ended = true;
+            ended = true;
+        },
+        ended: false
+    });
+    test.ok(ended);
+    test.done();
+};
+
 exports.handleTestRequestOptions = function(test) {
     var rpc = new RPCLib(),
         called = false;

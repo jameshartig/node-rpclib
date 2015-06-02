@@ -241,7 +241,7 @@ RPCLib.prototype._describeSelfHandler = function(req, response) {
 };
 
 
-function respondError(errorCode, errorMessage, id) {
+function respondError(errorCode, errorMessage, id, errorData) {
     var resp = {
         jsonrpc: '2.0',
         error: {
@@ -250,6 +250,10 @@ function respondError(errorCode, errorMessage, id) {
         },
         id: id
     };
+    //!= handles undefined and null
+    if (errorData != null) {
+        resp.error.data = errorData;
+    }
     return resp;
 }
 
@@ -329,10 +333,10 @@ RPCResponse.prototype.resolve = function(result) {
     this.result = respondResult(result, this._messageID);
     callAlways(this);
 };
-RPCResponse.prototype.reject = function(errorCode, errorMessage) {
+RPCResponse.prototype.reject = function(errorCode, errorMessage, errorData) {
     debug('RPCResponse rejected with code', errorCode);
     this.resolved = true;
-    this.result = respondError(errorCode, errorMessage, this._messageID);
+    this.result = respondError(errorCode, errorMessage, this._messageID, errorData);
     callAlways(this);
 };
 //with how early endResponse is added, this method is really useless for anything else

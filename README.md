@@ -52,9 +52,10 @@ Handles a request from a client. `requestBody` should the body of the request ma
 
 Resolves a request with the passed `result`.
 
-### resp.reject(errorCode[, errorMessage]) ###
+### resp.reject(errorCode[, errorMessage][, errorData]) ###
 
-Rejects a request and responds with an error object containing the passed code and message.
+Rejects a request and responds with an error object containing the passed code, message,
+and data.
 
 ### resp.set(name, value) ###
 
