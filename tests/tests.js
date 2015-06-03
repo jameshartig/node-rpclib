@@ -281,7 +281,7 @@ exports.callTest = function(test) {
     });
     rpc.call('test', {test: 'test'}, function(result) {
         test.notEqual(result.result, null);
-        test.equal(result.result && result.result.success, true);
+        test.equal(result.result.success, true);
         called = true;
     });
     test.ok(called);
@@ -289,18 +289,41 @@ exports.callTest = function(test) {
 };
 
 exports.callTestInvalidParams = function(test) {
-    var rpc = new RPCLib(),
-        called = false;
-    rpc.addMethod('test', function(params, response) {
+    var rpc = new RPCLib();
+    rpc.addMethod('test', function() {
         test.fail();
     }, {
         test: {type: 'string', optional: false}
     });
     rpc.call('test', function(result) {
         test.notEqual(result.error, null);
-        test.strictEqual(result.error && result.error.code, -32602);
-        called = true;
+        test.strictEqual(result.error.code, -32602);
+        test.done();
     });
-    test.ok(called);
-    test.done();
+};
+
+exports.callTestArray = function(test) {
+    var rpc = new RPCLib();
+    rpc.addMethod('test', function(params, response) {
+        response.resolve({success: true});
+    }, {
+        test: {type: 'array', optional: false}
+    });
+    rpc.call('test', {test: []}, function(result) {
+        test.ok(result.result.success);
+        test.done();
+    });
+};
+
+exports.callTestNotArray = function(test) {
+    var rpc = new RPCLib();
+    rpc.addMethod('test', function() {
+        test.fail();
+    }, {
+        test: {type: 'array', optional: false}
+    });
+    rpc.call('test', {test: {}}, function(result) {
+        test.strictEqual(result.error.code, -32602);
+        test.done();
+    });
 };

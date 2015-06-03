@@ -188,6 +188,9 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
         }
         v = methodDetail.params[k];
         t = typeof request.params[k];
+        if (v.type === 'array' && t === 'object' && Array.isArray(request.params[k])) {
+            t = 'array';
+        }
         if (v.type !== '*' && t !== v.type && (!v.optional || t !== 'undefined')) {
             debug('Method', request.method, 'requires param', k, 'to be type', v);
             response.reject(RPCLib.ERROR_INVALID_PARAMS);
