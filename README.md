@@ -46,6 +46,13 @@ is the request object sent from the client. `response` is an instance of `RPCRes
 Handles a request from a client. `requestBody` should the body of the request made and
 `serverResponse` should be an instance of `http.ServerResponse`.
 
+### rpc.call(method, [, params][, callback]) ###
+### rpc.call(method, callback) ###
+
+Calls a method added by `addMethod` and sends along the passed params. `callback` is
+called with `result`, which is the full JSON object (containing a `result` or `error`
+key) that would've been sent in response to an HTTP request.
+
 ## RPCResponse Methods ##
 
 ### resp.resolve(result) ###
@@ -91,7 +98,7 @@ Creates a new RPC client instance. `endpoint` should be a url.
 
 `endpoint` should be a url.
 
-### client.call(name, params, callback) ###
+### client.call(name[, params][, callback]) ###
 ### client.call(name, callback) ###
 
 Call an RPC method named `name` with `params`. `callback` will be called with `(err, result)`.

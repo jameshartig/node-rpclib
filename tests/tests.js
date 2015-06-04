@@ -327,3 +327,31 @@ exports.callTestNotArray = function(test) {
         test.done();
     });
 };
+
+exports.callTestResolveNull = function(test) {
+    test.expect(1);
+    var rpc = new RPCLib();
+    rpc.addMethod('test', function(params, response) {
+        response.resolve(null);
+    }, {
+        test: {type: 'string', optional: false}
+    });
+    rpc.call('test', {test: 'test'}, function(result) {
+        test.strictEqual(result.result, null);
+    });
+    test.done();
+};
+
+exports.callTestResolveUndefined = function(test) {
+    test.expect(1);
+    var rpc = new RPCLib();
+    rpc.addMethod('test', function(params, response) {
+        response.resolve();
+    }, {
+        test: {type: 'string', optional: false}
+    });
+    rpc.call('test', {test: 'test'}, function(result) {
+        test.strictEqual(result.result, null);
+    });
+    test.done();
+};

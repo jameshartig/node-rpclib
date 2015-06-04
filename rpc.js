@@ -260,12 +260,14 @@ function respondError(errorCode, errorMessage, id, errorData) {
     return resp;
 }
 
-function respondResult(result, id) {
-    var resp = {
-        jsonrpc: '2.0',
-        result: result || {},
-        id: id
-    };
+function respondResult(res, id) {
+    //don't allow undefined since that would result in the result key missing from json
+    var result = res !== undefined ? res : null,
+        resp = {
+            jsonrpc: '2.0',
+            result: result,
+            id: id
+        };
     return resp;
 }
 
