@@ -34,7 +34,8 @@ var PREDEFINED_ERROR_MESSAGES = {
 RPCLib.prototype.addMethod = function(name, handler, params, flags) {
     var obj = null,
         internal = false,
-        description, errors, n;
+        errors = null,
+        description, n;
     if (typeof handler === 'object') {
         obj = handler;
         handler = obj.handler;
@@ -63,6 +64,9 @@ RPCLib.prototype.addMethod = function(name, handler, params, flags) {
                 throw new TypeError('Invalid param sent to addMethod for param ' + n);
             }
         }
+    }
+    if (errors !== undefined && typeof errors !== 'object') {
+        throw new TypeError('Invalid error sent to addMethod for ' + name);
     }
     this.methods[name] = {
         params: params,
@@ -122,7 +126,7 @@ RPCLib.prototype.call = function(name, params, callback) {
 };
 
 function endResponse(respObj, response) {
-    if (response.get('silent')) {
+    if (response._silent) {
         response.end('');
     } else {
         response.end(respObj);
@@ -156,7 +160,7 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
     }
 
     if (request.id === undefined) {
-        response.set('silent', true);
+        response._silent = true;
     } else {
         response._setMessageID(request.id);
     }
@@ -198,6 +202,10 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
         }
     }
     params = request.params;
+
+    if (methodDetail.errors !== null) {
+        response._predefinedErrors = methodDetail.errors;
+    }
 
     try {
         if (this.preProcessor !== null && methodDetail.internal !== true) {
@@ -276,7 +284,7 @@ function callAlways(response) {
         return;
     }
     var callbacks = response._alwaysCallbacks,
-        i, arr, cb;
+        i;
     //always make sure the callbacks are null otherwise we might infinite loop
     response._alwaysCallbacks = null;
     try {
@@ -288,7 +296,7 @@ function callAlways(response) {
             response.result = callbacks(response.result, response);
         }
     } catch (e) {
-        if (response.get('silent')) {
+        if (response._silent) {
             response.end('');
         } else {
             response.end(JSON.stringify(response.reject(RPCLib.ERROR_INTERNAL_ERROR)));
@@ -309,14 +317,17 @@ function RPCResponse(httpResponse) {
         this._rawResult = true;
     } else {
         this._httpResponse = httpResponse;
-        this._rawResult = false;
     }
-    this._messageID = null;
-    this._alwaysCallbacks = null;
-    this.keyVals = null;
-    this.resolved = false;
-    this.result = null;
 }
+RPCResponse.prototype._silent = false;
+RPCResponse.prototype._predefinedErrors = null;
+RPCResponse.prototype._messageID = null;
+RPCResponse.prototype._alwaysCallbacks = null;
+RPCResponse.prototype._rawResult = false;
+RPCResponse.prototype.keyVals = null;
+RPCResponse.prototype.resolved = false;
+RPCResponse.prototype.result = null;
+
 RPCResponse.prototype._setMessageID = function(id) {
     this._messageID = id;
 };
@@ -338,7 +349,20 @@ RPCResponse.prototype.resolve = function(result) {
     this.result = respondResult(result, this._messageID);
     callAlways(this);
 };
-RPCResponse.prototype.reject = function(errorCode, errorMessage, errorData) {
+RPCResponse.prototype.reject = function(errorCode, errorMsg, data) {
+    var errorData = data,
+        errorMessage;
+    if (arguments.length === 2 && typeof errorMsg === 'object') {
+        errorData = errorMsg;
+        errorMessage = undefined;
+    } else {
+        errorMessage = errorMsg;
+    }
+    //!= null handles null and undefined
+    if (errorMessage === undefined && this._predefinedErrors != null) {
+        errorMessage = this._predefinedErrors[errorCode];
+    }
+
     debug('RPCResponse rejected with code', errorCode);
     this.resolved = true;
     this.result = respondError(errorCode, errorMessage, this._messageID, errorData);
@@ -389,7 +413,7 @@ function RPCResponseGroup(httpResponse) {
 }
 RPCResponseGroup.prototype.add = function(response, rpc) {
     var f = function(respObj, response) {
-            if (!response.get('silent')) {
+            if (!response._silent) {
                 this.results.push(JSON.stringify(respObj));
             }
             this._resolvedCount++;

@@ -2,6 +2,7 @@
 
 ### 0.1.0 ###
 * Fixed resolve(null) actually resolving with {}
+* reject with no message defaults to message from definition
 
 ### 0.0.11 ###
 * `array` type is now enforced (`object` still continue to match arrays and objects)

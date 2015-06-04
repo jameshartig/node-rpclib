@@ -121,14 +121,46 @@ exports.handleTestRequestRejectMessage = function(test) {
 exports.handleTestRequestRejectData = function(test) {
     var rpc = new RPCLib(),
         ended = false;
-    rpc.addMethod('test', function(params, response) {
-        response.reject(1, 'Test', {extra: true});
-    }, {
-        test: {type: 'string', optional: false}
+    rpc.addMethod('test', {
+        handler: function(params, response) {
+            response.reject(1, 'Test', {extra: true});
+        },
+        params: {},
+        errors: {
+            1: 'test message'
+        }
     });
-    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {test: 'test'}, id: 1}), {
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}), {
         end: function(str) {
             test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: 1, message: 'Test', data: {extra: true}}, id: 1}));
+            this.ended = true;
+            ended = true;
+        },
+        ended: false
+    });
+    test.ok(ended);
+    test.done();
+};
+
+exports.handleTestRequestDefaultMessage = function(test) {
+    var rpc = new RPCLib(),
+        ended = false;
+    rpc.addMethod('test', {
+        handler: function(params, response) {
+            response.reject(1);
+        },
+        params: {},
+        errors: {
+            1: 'test message'
+        }
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({
+                jsonrpc: '2.0',
+                error: {code: 1, message: 'test message'},
+                id: 1
+            }));
             this.ended = true;
             ended = true;
         },
