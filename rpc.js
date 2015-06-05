@@ -213,7 +213,8 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
             dfd = this.preProcessor(request, response, methodDetail.flags);
             //if they returned a dfd wait until its done before calling handler
             if (dfd && typeof dfd.then === 'function') {
-                dfd.then(function() {
+                //call done so it throws if there's an error but we're not guranateed everything will support done >_<
+                dfd[typeof dfd.done === 'function' ? 'done' : 'then'](function() {
                     if (response.resolved) {
                         debug('preProcessor resolved response');
                         return;
@@ -230,6 +231,7 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
 
         callHandler(methodDetail.handler, params, response, request);
     } catch (e) {
+        debug('Error from handler/preProcessor call', e);
         response.reject(RPCLib.ERROR_INTERNAL_ERROR);
         throw e;
     }
