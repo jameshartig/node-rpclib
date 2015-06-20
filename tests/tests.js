@@ -23,6 +23,51 @@ exports.addMethodOptions = function(test) {
     test.done();
 };
 
+exports.undefinedMethod = function(test) {
+    test.expect(1);
+    var rpc = new RPCLib();
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {test: 'test'}, id: 1}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: -32601, message: 'Method not found'}, id: 1}));
+            this.ended = true;
+        },
+        ended: false
+    });
+    test.done();
+};
+
+exports.removeMethod = function(test) {
+    test.expect(2);
+    var rpc = new RPCLib();
+    rpc.addMethod('test', function(params, response) {
+        response.resolve(true);
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', id: 1}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({
+                jsonrpc: '2.0',
+                result: true,
+                id: 1
+            }));
+            this.ended = true;
+        },
+        ended: false
+    });
+    rpc.removeMethod('test');
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', id: 2}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({
+                jsonrpc: '2.0',
+                error: {code: -32601, message: 'Method not found'},
+                id: 2
+            }));
+            this.ended = true;
+        },
+        ended: false
+    });
+    test.done();
+};
+
 exports.addMethodInvalidParams = function(test) {
     test.expect(1);
     var rpc = new RPCLib();

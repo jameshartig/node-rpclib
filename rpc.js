@@ -79,6 +79,12 @@ RPCLib.prototype.addMethod = function(name, handler, params, flags) {
     };
 };
 
+RPCLib.prototype.removeMethod = function(name) {
+    if (this.methods.hasOwnProperty(name)) {
+        delete this.methods[name];
+    }
+};
+
 RPCLib.prototype.setPreProcessor = function(func) {
     if (func === null) {
         this.preProcessor = null;
