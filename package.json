@@ -10,6 +10,9 @@
     "deferred": "^0.7.2",
     "nodeunit": "^0.9.0"
   },
+  "dependencies": {
+    "buffer-concat-limit": "^0.0.1"
+  },
   "scripts": {
     "test": "nodeunit tests"
   },

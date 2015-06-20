@@ -2,6 +2,7 @@ var util = require('util'),
     assert = require('assert'),
     http = require('http'),
     url = require('url'),
+    bufferConcatLimit = require("buffer-concat-limit"),
     _EMPTY_OBJECT_ = {},
     debug;
 debug = util.debuglog('rpclib');
@@ -196,7 +197,7 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
             t = 'array';
         }
         if (v.type !== '*' && t !== v.type && (!v.optional || t !== 'undefined')) {
-            debug('Method', request.method, 'requires param', k, 'to be type', v);
+            debug('Method', request.method, 'requires param \"' + k + '" to be type', v, 'was', t);
             response.reject(RPCLib.ERROR_INVALID_PARAMS);
             return;
         }
@@ -485,13 +486,33 @@ RPCClient.prototype.call = function(name, params, callback) {
 
     req = http.request(reqOptions, function(result) {
         debug('Received result for call', result.statusCode);
-        //todo: can we get multiple 'data' events that we need to concat?
-        result.once('data', function(data) {
+        function onClose() {
+            resolve({
+                type: 'http',
+                statusCode: result.statusCode,
+                code: RPCLib.ERROR_SERVER_ERROR,
+                message: 'Server returned no body'
+            }, null);
+        }
+        var bufferedData = null;
+        result.on('data', function(data) {
+            if (bufferedData === null) {
+                bufferedData = data;
+                return;
+            }
+            bufferedData = bufferConcatLimit(bufferedData, data);
+        });
+        result.once('end', function() {
+            if (bufferedData === null) {
+                onClose();
+                return;
+            }
             var rpcResult = null;
             try {
-                rpcResult = JSON.parse(data);
+                rpcResult = JSON.parse(bufferedData);
                 resolve(rpcResult.error || null, rpcResult.result || null);
-            } catch (ignore) {
+            } catch (e) {
+                debug('Error parsing json response from call', e, '\nResponse:', bufferedData.toString());
                 resolve({
                     type: 'json',
                     statusCode: result.statusCode,
@@ -500,14 +521,7 @@ RPCClient.prototype.call = function(name, params, callback) {
                 }, null);
             }
         });
-        result.once('close', function() {
-            resolve({
-                type: 'http',
-                statusCode: result.statusCode,
-                code: RPCLib.ERROR_SERVER_ERROR,
-                message: 'Server returned no body'
-            }, null);
-        });
+        result.once('close', onClose);
     });
     req.on('error', function(err) {
         resolve({
