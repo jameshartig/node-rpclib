@@ -1,6 +1,6 @@
 {
   "name": "rpclib",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Library that simplifies building an JSON-RPC endpoint",
   "main": "rpc.js",
   "directories": {
