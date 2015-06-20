@@ -1,7 +1,12 @@
 ## Changelog ##
 
+### 0.1.1 ###
+* Fixed handling of undefined `params` in request
+* Added `removeMethod`
+* Fixed multi-packet responses in RPCClient
+
 ### 0.1.0 ###
-* Fixed resolve(null) actually resolving with {}
+* Fixed resolve(null) actually resolving with `null`
 * reject with no message defaults to message from definition
 * Exceptions throw in handler will now correctly throw if using promise in preProcessor
 

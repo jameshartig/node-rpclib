@@ -17,7 +17,7 @@ Creates a new RPC library instance. Should be done at application start up.
 ### rpc.addMethod(name, handler[, params][, flags]) ###
 ### rpc.addMethod(name, options) ###
 
-Adds a new handler for a method name. `options` should be an object that has
+Adds a new handler for method `name`. `options` should be an object that has
 `handler`, `params`, and `flags`, as keys. `handler` is a callback that is
 called with (params, response) when a new request is made for this method
 name. `params` is the params object sent from the client. `response` is an
@@ -33,6 +33,10 @@ instance of `RPCResponse`.
 }
 ```
 `flags` are completely optional and will be passed to your pre-processor(s).
+
+### rpc.removeMethod(name) ###
+
+Removes the handler for method `name`.
 
 ### rpc.setPreProcessor(func) ###
 
