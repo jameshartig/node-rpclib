@@ -193,12 +193,13 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
         response.reject(RPCLib.ERROR_INVALID_METHOD);
         return false;
     }
+
     for (k in methodDetail.params) {
         if (!methodDetail.params.hasOwnProperty(k)) {
             continue;
         }
         v = methodDetail.params[k];
-        t = typeof request.params[k];
+        t = request.params ? typeof request.params[k] : 'undefined';
         if (v.type === 'array' && t === 'object' && Array.isArray(request.params[k])) {
             t = 'array';
         }

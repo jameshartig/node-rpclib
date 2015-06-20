@@ -328,6 +328,24 @@ exports.invalidJSON = function(test) {
     test.done();
 };
 
+exports.missingParams = function(test) {
+    test.expect(1);
+    var rpc = new RPCLib();
+    rpc.addMethod('test', function(params, response) {
+        response.resolve();
+    }, {
+        test: {type: 'number', optional: false}
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', id: 1}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: -32602, message: 'Invalid params'}, id: 1}));
+            this.ended = true;
+        },
+        ended: false
+    });
+    test.done();
+};
+
 exports.setHeaderToJSON = function(test) {
     var rpc = new RPCLib(),
         called = false;
