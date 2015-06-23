@@ -1,5 +1,8 @@
 ## Changelog ##
 
+### 0.1.2 ###
+* Wrap httpResponse.end in try/catch in case client closed
+
 ### 0.1.1 ###
 * Fixed handling of undefined `params` in request
 * Added `removeMethod`
