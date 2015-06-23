@@ -409,7 +409,12 @@ function RPCResponseEnd(message) {
     } else {
         response = this._rawResult ? this.result : JSON.stringify(this.result);
     }
-    this._httpResponse.end(response);
+    try {
+        this._httpResponse.end(response);
+    } catch (e) {
+        //this will most likely only happen when the httpResponse was already closed on the client side
+        debug('Failed to end httpResponse', e);
+    }
 }
 RPCResponse.prototype.end = RPCResponseEnd;
 

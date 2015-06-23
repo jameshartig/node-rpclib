@@ -251,6 +251,21 @@ exports.handleTestRequests = function(test) {
     test.done();
 };
 
+exports.handleEndThrowing = function(test) {
+    var rpc = new RPCLib();
+    rpc.addMethod('test', function(params, response) {
+        response.resolve(1);
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', id: 1}), {
+        end: function() {
+            throw new Error('Broke');
+        },
+        ended: false
+    });
+    test.ok(true);
+    test.done();
+};
+
 exports.preProcessor = function(test) {
     var rpc = new RPCLib(),
         called = false;
