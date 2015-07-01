@@ -1,5 +1,8 @@
 ## Changelog ##
 
+### 0.1.4 ###
+* Added abort() to RPCClientResult
+
 ### 0.1.3 ###
 * Return a RPCClientResult from client.call to expose setTimeout
 
