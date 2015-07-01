@@ -444,13 +444,56 @@ RPCResponseGroup.prototype.add = function(response, rpc) {
 };
 RPCResponseGroup.prototype.end = RPCResponseEnd;
 
+function RPCClientResult(httpReq, resolve) {
+    if (!httpReq || typeof httpReq.abort !== 'function') {
+        throw new TypeError('Invalid httpReq sent to RPCClientResult');
+    }
+    if (typeof resolve !== 'function') {
+        throw new TypeError('Invalid resolve sent to RPCClientResult');
+    }
+    this._httpReq = httpReq;
+    this._resolve = resolve;
+    this.ended = false;
+    this.timer = null;
+    httpReq.once('response', function() {
+        this.ended = true;
+        if (this.timer !== null) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+    }.bind(this));
+}
+RPCClientResult.prototype.setTimeout = function(timeout) {
+    if (this.ended) {
+        return this;
+    }
+    if (this.timer !== null) {
+        clearTimeout(this.timer);
+        this.timer = null;
+    }
+    if (timeout > 0) {
+        this.timer = setTimeout(function() {
+            if (!this.ended) {
+                this._httpReq.removeAllListeners('response');
+                this._httpReq.abort();
+                this.ended = true;
+            }
+            this._resolve({
+                type: 'timeout',
+                code: 0,
+                message: 'Timed out waiting for response'
+            }, null);
+        }.bind(this), timeout);
+    }
+    return this;
+};
+
 function RPCClient(endpoint) {
     if (endpoint) {
         this.setEndpoint(endpoint);
-    } else {
-        this.url = null;
     }
 }
+RPCClient.prototype.url = null;
 RPCClient.prototype.setEndpoint = function(endpoint) {
     debug('setEndpoint', endpoint);
     this.url = url.parse(endpoint);
@@ -494,7 +537,7 @@ RPCClient.prototype.call = function(name, params, callback) {
             callback(err, res);
             callback = null;
         },
-        req;
+        req, clientResult;
 
     req = http.request(reqOptions, function(result) {
         debug('Received result for call', result.statusCode);
@@ -545,6 +588,8 @@ RPCClient.prototype.call = function(name, params, callback) {
     });
     req.write(postData);
     req.end();
+    clientResult = new RPCClientResult(req, resolve);
+    return clientResult;
 };
 
 RPCLib.RPCClient = RPCClient;

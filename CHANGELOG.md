@@ -1,5 +1,8 @@
 ## Changelog ##
 
+### 0.1.3 ###
+* Return a RPCClientResult from client.call to expose setTimeout
+
 ### 0.1.2 ###
 * Wrap httpResponse.end in try/catch in case client closed
 

@@ -10,6 +10,12 @@ rpc.addMethod('test', function(params, response) {
     response.resolve(params || {});
 }, {test: {type: 'string', optional: true}});
 
+rpc.addMethod('wait', function(params, response) {
+    setTimeout(function() {
+        response.resolve({done: true});
+    }, params.timeout);
+}, {timeout: 'number'});
+
 server = http.createServer(function(req, res) {
     req.on('data', function(body) {
         rpc.handleRequest(body.toString(), res);
@@ -66,6 +72,27 @@ exports.brokenURL = function(test) {
         test.equal(err.socketError.code, 'ENOTFOUND');
         test.done();
     });
+};
+
+exports.setTimeout = function(test) {
+    test.expect(3);
+    var clientRes;
+    clientRes = client.call('wait', {timeout: 200}, function(err) {
+        test.strictEqual(err.code, 0);
+        test.equal(err.type, 'timeout');
+        test.ok(clientRes._httpReq.aborted > 0);
+        test.done();
+    }).setTimeout(100);
+};
+
+exports.setTimeoutZero = function(test) {
+    test.expect(2);
+    var clientRes;
+    clientRes = client.call('wait', {timeout: 200}, function(err, res) {
+        test.ok(res && res.done);
+        test.ok(!clientRes._httpReq.aborted);
+        test.done();
+    }).setTimeout(100).setTimeout(0);
 };
 
 

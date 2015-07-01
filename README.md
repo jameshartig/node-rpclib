@@ -91,7 +91,7 @@ Get arbitrary data that was previously stored with `set`.
 ### Usage ###
 
 ```JS
-var RPCClient = require('rpclib').RPCCLient;
+var RPCClient = require('rpclib').RPCClient;
 ```
 
 ### client = new RPCClient([endpoint]) ###
@@ -106,3 +106,5 @@ Creates a new RPC client instance. `endpoint` should be a url.
 ### client.call(name, callback) ###
 
 Call an RPC method named `name` with `params`. `callback` will be called with `(err, result)`.
+Returns an instance of `RPCClientResult` which currently only exposes one method, `setTimeout(timeout)`,
+which can be used to set the timeout on the call.
