@@ -96,11 +96,13 @@ exports.setTimeoutZero = function(test) {
 };
 
 exports.abort = function(test) {
-    test.expect(1);
-    var ran = false;
-    client.call('test', function() {
+    test.expect(2);
+    var ran = false,
+        clientRes;
+    clientRes = client.call('test', function() {
         ran = true;
-    }).abort();
+    }).setTimeout(100).abort();
+    test.strictEqual(clientRes.timer, null);
     setTimeout(function() {
         test.ok(!ran);
         test.done();

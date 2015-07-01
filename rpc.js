@@ -474,6 +474,7 @@ RPCClientResult.prototype.setTimeout = function(timeout) {
     if (timeout > 0) {
         this.timer = setTimeout(function() {
             if (this.ended) {
+                this.timer = null;
                 return;
             }
             this.abort();
@@ -491,6 +492,10 @@ RPCClientResult.prototype.abort = function() {
         this._httpReq.removeAllListeners('response');
         this._httpReq.abort();
         this.ended = true;
+    }
+    if (this.timer !== null) {
+        clearTimeout(this.timer);
+        this.timer = null;
     }
     return this;
 };
