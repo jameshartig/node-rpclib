@@ -477,6 +477,7 @@ RPCClientResult.prototype.setTimeout = function(timeout) {
                 this.timer = null;
                 return;
             }
+            debug('RPCClientResult timed out');
             this.abort();
             this._resolve({
                 type: 'timeout',
@@ -488,6 +489,7 @@ RPCClientResult.prototype.setTimeout = function(timeout) {
     return this;
 };
 RPCClientResult.prototype.abort = function() {
+    debug('abort RPCClientResult');
     if (!this.ended) {
         this._httpReq.removeAllListeners('response');
         this._httpReq.abort();
