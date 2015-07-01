@@ -473,17 +473,24 @@ RPCClientResult.prototype.setTimeout = function(timeout) {
     }
     if (timeout > 0) {
         this.timer = setTimeout(function() {
-            if (!this.ended) {
-                this._httpReq.removeAllListeners('response');
-                this._httpReq.abort();
-                this.ended = true;
+            if (this.ended) {
+                return;
             }
+            this.abort();
             this._resolve({
                 type: 'timeout',
                 code: 0,
                 message: 'Timed out waiting for response'
             }, null);
         }.bind(this), timeout);
+    }
+    return this;
+};
+RPCClientResult.prototype.abort = function() {
+    if (!this.ended) {
+        this._httpReq.removeAllListeners('response');
+        this._httpReq.abort();
+        this.ended = true;
     }
     return this;
 };

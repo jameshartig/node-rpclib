@@ -95,6 +95,18 @@ exports.setTimeoutZero = function(test) {
     }).setTimeout(100).setTimeout(0);
 };
 
+exports.abort = function(test) {
+    test.expect(1);
+    var ran = false;
+    client.call('test', function() {
+        ran = true;
+    }).abort();
+    setTimeout(function() {
+        test.ok(!ran);
+        test.done();
+    }, 100);
+};
+
 
 /**
  * This MUST be the last test run!
