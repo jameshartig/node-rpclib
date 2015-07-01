@@ -593,6 +593,10 @@ RPCClient.prototype.call = function(name, params, callback) {
         result.once('close', onClose);
     });
     req.on('error', function(err) {
+        //if the clientResult already ended then it must be a timeout or an abort
+        if (clientResult && clientResult.ended) {
+            return;
+        }
         resolve({
             type: 'http',
             socketError: err,
