@@ -380,8 +380,7 @@ exports.setHeaderToJSON = function(test) {
 };
 
 exports.callTest = function(test) {
-    var rpc = new RPCLib(),
-        called = false;
+    var rpc = new RPCLib();
     rpc.addMethod('test', function(params, response) {
         test.equal(typeof params, 'object');
         test.equal(params.test, 'test');
@@ -392,10 +391,8 @@ exports.callTest = function(test) {
     rpc.call('test', {test: 'test'}, function(result) {
         test.notEqual(result.result, null);
         test.equal(result.result.success, true);
-        called = true;
+        test.done();
     });
-    test.ok(called);
-    test.done();
 };
 
 exports.callTestInvalidParams = function(test) {
@@ -448,8 +445,8 @@ exports.callTestResolveNull = function(test) {
     });
     rpc.call('test', {test: 'test'}, function(result) {
         test.strictEqual(result.result, null);
+        test.done();
     });
-    test.done();
 };
 
 exports.callTestResolveUndefined = function(test) {
@@ -462,6 +459,6 @@ exports.callTestResolveUndefined = function(test) {
     });
     rpc.call('test', {test: 'test'}, function(result) {
         test.strictEqual(result.result, null);
+        test.done();
     });
-    test.done();
 };

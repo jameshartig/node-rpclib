@@ -1,5 +1,8 @@
 ## Changelog ##
 
+### 0.1.5 ###
+* Call "end" function on nextTick to prevent any exceptions from bubbling into RPCResponseEnd
+
 ### 0.1.4 ###
 * Added abort() to RPCClientResult
 

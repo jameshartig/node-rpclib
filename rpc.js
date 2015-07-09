@@ -320,7 +320,9 @@ function RPCResponse(httpResponse) {
         this._httpResponse = {
             end: function(result) {
                 this.ended = true;
-                httpResponse(result);
+                process.nextTick(function() {
+                    httpResponse(result);
+                });
             },
             ended: false
         };
