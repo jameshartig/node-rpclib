@@ -1,5 +1,9 @@
 ## Changelog ##
 
+### 0.1.6 ###
+* Fix "Invalid Request" response to include null ID to follow spec
+* Fix "Invalid Request" being sometimes treated as silent
+
 ### 0.1.5 ###
 * Call "end" function on nextTick to prevent any exceptions from bubbling into RPCResponseEnd
 

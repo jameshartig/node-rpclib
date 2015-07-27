@@ -166,9 +166,7 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
         return;
     }
 
-    if (request.id === undefined) {
-        response._silent = true;
-    } else {
+    if (request.id !== undefined) {
         response._setMessageID(request.id);
     }
     if (request.jsonrpc !== '2.0') {
@@ -185,6 +183,13 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
         debug('Invalid params value received');
         response.reject(RPCLib.ERROR_INVALID_REQUEST);
         return;
+    }
+
+    //according to the spec we must send back something even if invalid request so move this till after
+    //we verify that the request is valid, otherwise we might incorrectly think something is silent
+    //when its actually an invalid request
+    if (request.id === undefined) {
+        response._silent = true;
     }
 
     methodDetail = this.methods[request.method];
@@ -405,7 +410,7 @@ function RPCResponseEnd(message) {
     if (message !== undefined) {
         if (typeof message !== 'string' && !Buffer.isBuffer(message)) {
             response = this._rawResult ? message : JSON.stringify(message);
-        } else if (message.length > 0) {
+        } else if (message !== null) {
             response = message;
         }
     } else {

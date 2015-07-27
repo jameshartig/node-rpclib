@@ -343,6 +343,36 @@ exports.invalidJSON = function(test) {
     test.done();
 };
 
+exports.invalidRPCVersion = function(test) {
+    var rpc = new RPCLib(),
+        ended = false;
+    rpc.handleRequest(JSON.stringify({method: 'test', params: {}}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: -32600, message: 'Invalid Request'}, id: null}));
+            this.ended = true;
+            ended = true;
+        },
+        ended: false
+    });
+    test.ok(ended);
+    test.done();
+};
+
+exports.invalidRPCVersionID = function(test) {
+    var rpc = new RPCLib(),
+        ended = false;
+    rpc.handleRequest(JSON.stringify({method: 'test', params: {}, id: 1}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: -32600, message: 'Invalid Request'}, id: 1}));
+            this.ended = true;
+            ended = true;
+        },
+        ended: false
+    });
+    test.ok(ended);
+    test.done();
+};
+
 exports.missingParams = function(test) {
     test.expect(1);
     var rpc = new RPCLib();
