@@ -1,6 +1,6 @@
 ## Changelog ##
 
-### 0.1.7 ###
+### 0.1.8 ###
 * Fixed utf-8 client payloads sending wrong Content-Length
 
 ### 0.1.6 ###
