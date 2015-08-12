@@ -548,7 +548,7 @@ RPCClient.prototype.call = function(name, params, callback) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Content-Length': postData.length
+                'Content-Length': Buffer.byteLength(postData)
             }
         },
         resolve = function(err, res) {
