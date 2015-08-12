@@ -1,5 +1,8 @@
 ## Changelog ##
 
+### 0.1.7 ###
+* Fixed utf-8 client payloads sending wrong Content-Length
+
 ### 0.1.6 ###
 * Fix "Invalid Request" response to include null ID to follow spec
 * Fix "Invalid Request" being sometimes treated as silent
