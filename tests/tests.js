@@ -98,6 +98,19 @@ exports.addMethodStringParam = function(test) {
     test.done();
 };
 
+exports.addMethodNullParams = function(test) {
+    test.expect(1);
+    var rpc = new RPCLib();
+    rpc.addMethod('test', {
+        handler: function(params) {
+            test.equal(Object.keys(params).length, 0);
+        },
+        params: null
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {test: 'test'}, id: 1}));
+    test.done();
+};
+
 exports.handleTestRequest = function(test) {
     var rpc = new RPCLib(),
         called = false,

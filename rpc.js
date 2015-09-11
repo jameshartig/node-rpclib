@@ -49,8 +49,10 @@ RPCLib.prototype.addMethod = function(name, handler, params, flags) {
     if (typeof handler !== 'function') {
         throw new TypeError('Invalid handler method sent to addMethod for ' + name);
     }
-    if (typeof params !== 'object' || params === null) {
+    if (typeof params !== 'object') {
         params = _EMPTY_OBJECT_;
+    } else if (params === null) {
+        params = null;
     } else {
         for (n in params) {
             if (!params.hasOwnProperty(n)) {
@@ -199,22 +201,27 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
         return false;
     }
 
-    for (k in methodDetail.params) {
-        if (!methodDetail.params.hasOwnProperty(k)) {
-            continue;
+    //if the params are explictly null then drop all params
+    if (methodDetail.params === null) {
+        params = {};
+    } else {
+        for (k in methodDetail.params) {
+            if (!methodDetail.params.hasOwnProperty(k)) {
+                continue;
+            }
+            v = methodDetail.params[k];
+            t = request.params ? typeof request.params[k] : 'undefined';
+            if (v.type === 'array' && t === 'object' && Array.isArray(request.params[k])) {
+                t = 'array';
+            }
+            if (v.type !== '*' && t !== v.type && (!v.optional || t !== 'undefined')) {
+                debug('Method', request.method, 'requires param \"' + k + '" to be type', v, 'was', t);
+                response.reject(RPCLib.ERROR_INVALID_PARAMS);
+                return;
+            }
         }
-        v = methodDetail.params[k];
-        t = request.params ? typeof request.params[k] : 'undefined';
-        if (v.type === 'array' && t === 'object' && Array.isArray(request.params[k])) {
-            t = 'array';
-        }
-        if (v.type !== '*' && t !== v.type && (!v.optional || t !== 'undefined')) {
-            debug('Method', request.method, 'requires param \"' + k + '" to be type', v, 'was', t);
-            response.reject(RPCLib.ERROR_INVALID_PARAMS);
-            return;
-        }
+        params = request.params;
     }
-    params = request.params;
 
     if (methodDetail.errors !== null) {
         response._predefinedErrors = methodDetail.errors;

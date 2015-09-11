@@ -1,5 +1,8 @@
 ## Changelog ##
 
+### 0.2.0 ###
+* Added explicit handling of null params when adding new method
+
 ### 0.1.8 ###
 * Fixed utf-8 client payloads sending wrong Content-Length
 
