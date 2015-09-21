@@ -562,8 +562,9 @@ RPCClient.prototype.call = function(name, params, callback) {
             if (callback === null) {
                 return;
             }
-            callback(err, res);
+            var cb = callback;
             callback = null;
+            cb(err, res);
         },
         req, clientResult;
 
@@ -593,7 +594,6 @@ RPCClient.prototype.call = function(name, params, callback) {
             var rpcResult = null;
             try {
                 rpcResult = JSON.parse(bufferedData);
-                resolve(rpcResult.error || null, rpcResult.result || null);
             } catch (e) {
                 debug('Error parsing json response from call', e, '\nResponse:', bufferedData.toString());
                 resolve({
@@ -602,7 +602,9 @@ RPCClient.prototype.call = function(name, params, callback) {
                     code: RPCLib.ERROR_SERVER_ERROR,
                     message: 'Server returned invalid JSON'
                 }, null);
+                return;
             }
+            resolve(rpcResult.error || null, rpcResult.result || null);
         });
         result.once('close', onClose);
     });
