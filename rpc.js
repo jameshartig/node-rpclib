@@ -593,7 +593,8 @@ RPCClient.prototype.call = function(name, params, callback) {
             }
             var rpcResult = null;
             try {
-                rpcResult = JSON.parse(bufferedData);
+                rpcResult = JSON.parse(bufferedData) || {};
+                //todo: verify jsonrpc version
             } catch (e) {
                 debug('Error parsing json response from call', e, '\nResponse:', bufferedData.toString());
                 resolve({
