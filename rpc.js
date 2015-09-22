@@ -197,7 +197,7 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
     methodDetail = this.methods[request.method];
     if (methodDetail === undefined) {
         debug('Method', request.method, 'doesnt exist');
-        response.reject(RPCLib.ERROR_INVALID_METHOD);
+        response.reject(RPCLib.ERROR_INVALID_METHOD, {method: request.method});
         return false;
     }
 
@@ -216,7 +216,7 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
             }
             if (v.type !== '*' && t !== v.type && (!v.optional || t !== 'undefined')) {
                 debug('Method', request.method, 'requires param \"' + k + '" to be type', v, 'was', t);
-                response.reject(RPCLib.ERROR_INVALID_PARAMS);
+                response.reject(RPCLib.ERROR_INVALID_PARAMS, {param: k, expectedType: v.type, sentType: t});
                 return;
             }
         }

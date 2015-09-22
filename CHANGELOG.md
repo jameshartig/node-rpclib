@@ -1,5 +1,8 @@
 ## Changelog ##
 
+### 0.2.2 ###
+* Added helpful data to the error `data` when method is invalid or params are invalid
+
 ### 0.2.1 ###
 * Don't allow resolve throws to seem like a json error
 * Fixed case where callback sent to `call` could be called twice

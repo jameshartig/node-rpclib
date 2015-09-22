@@ -28,7 +28,8 @@ exports.undefinedMethod = function(test) {
     var rpc = new RPCLib();
     rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {test: 'test'}, id: 1}), {
         end: function(str) {
-            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: -32601, message: 'Method not found'}, id: 1}));
+            var error = {code: -32601, message: 'Method not found', data: {method: 'test'}};
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: error, id: 1}));
             this.ended = true;
         },
         ended: false
@@ -58,7 +59,7 @@ exports.removeMethod = function(test) {
         end: function(str) {
             test.strictEqual(str, JSON.stringify({
                 jsonrpc: '2.0',
-                error: {code: -32601, message: 'Method not found'},
+                error: {code: -32601, message: 'Method not found', data: {method: 'test'}},
                 id: 2
             }));
             this.ended = true;
@@ -396,7 +397,10 @@ exports.missingParams = function(test) {
     });
     rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', id: 1}), {
         end: function(str) {
-            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: -32602, message: 'Invalid params'}, id: 1}));
+            var error = {code: -32602, message: 'Invalid params', data: {
+                param: 'test', expectedType: 'number', sentType: 'undefined'
+            }};
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: error, id: 1}));
             this.ended = true;
         },
         ended: false
