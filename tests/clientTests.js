@@ -47,6 +47,14 @@ exports.callSimple = function(test) {
     });
 };
 
+exports.callPromise = function(test) {
+    test.expect(1);
+    client.call('test', {test: 'test'}).then(function(res) {
+        test.equal(res.test, 'test');
+        test.done();
+    });
+};
+
 exports.callNoParams = function(test) {
     test.expect(1);
     client.call('test', function(err, res) {
@@ -60,6 +68,14 @@ exports.callInvalidMethod = function(test) {
     client.call('invalidMethod', function(err, res) {
         test.strictEqual(err.code, RPCLib.ERROR_INVALID_METHOD);
         test.strictEqual(res, null);
+        test.done();
+    });
+};
+
+exports.callInvalidMethodPromise = function(test) {
+    test.expect(1);
+    client.call('invalidMethod').catch(function(err) {
+        test.strictEqual(err.code, RPCLib.ERROR_INVALID_METHOD);
         test.done();
     });
 };

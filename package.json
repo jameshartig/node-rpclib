@@ -11,7 +11,8 @@
     "nodeunit": "^0.9.1"
   },
   "dependencies": {
-    "buffer-concat-limit": "^0.0.1"
+    "buffer-concat-limit": "^0.0.1",
+    "levenlabs-log": "^0.1.1"
   },
   "scripts": {
     "test": "nodeunit tests"

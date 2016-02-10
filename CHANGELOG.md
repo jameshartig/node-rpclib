@@ -1,5 +1,10 @@
 ## Changelog ##
 
+### 0.3.0 ###
+* Return promise in client
+* Switch to levenlabs-log
+* Pass long original `http.IncomingMessage`
+
 ### 0.2.2 ###
 * Added helpful data to the error `data` when method is invalid or params are invalid
 

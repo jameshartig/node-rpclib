@@ -19,9 +19,10 @@ Creates a new RPC library instance. Should be done at application start up.
 
 Adds a new handler for method `name`. `options` should be an object that has
 `handler`, `params`, and `flags`, as keys. `handler` is a callback that is
-called with (params, response) when a new request is made for this method
-name. `params` is the params object sent from the client. `response` is an
-instance of `RPCResponse`.
+called with (params, response, httpRequest) when a new request is made for this
+method name. `params` is the params object sent from the client. `response` is
+an instance of `RPCResponse`. `httpRequest`, if this call originated from an
+http request, will be an instance of `http.IncomingMessage`.
 
 `params` should be a hash like this example:
 ```JS
@@ -47,14 +48,18 @@ Removes the handler for method `name`.
 ### rpc.setPreProcessor(func) ###
 
 Sets the pre-processor, which is called before the handler but after the request is
-validated. The `func` is sent (requestObject, response, methodFlags). `requestObject`
-is the request object sent from the client. `response` is an instance of `RPCResponse`.
-`methodFlags` are the flags that were defined with the method.
+validated. The `func` is sent (requestObject, response, methodFlags, httpRequest).
+`requestObject` is the request object sent from the client. `response` is an
+instance of `RPCResponse`. `methodFlags` are the flags that were defined with
+the method. `httpRequest`, if this call originated from an http request, will be
+an instance of `http.IncomingMessage`.
 
-### rpc.handleRequest(requestBody, serverResponse) ###
+### rpc.handleRequest(requestBody, serverResponse, httpRequest) ###
 
 Handles a request from a client. `requestBody` should the body of the request made and
-`serverResponse` should be an instance of `http.ServerResponse`.
+`serverResponse` should be an instance of `http.ServerResponse`. `httpRequest`
+should be an instance of `http.IncomingMessage` if this call orginated from an
+http request.
 
 ### rpc.call(method, [, params][, callback]) ###
 ### rpc.call(method, callback) ###
@@ -109,8 +114,9 @@ Creates a new RPC client instance. `endpoint` should be a url.
 `endpoint` should be a url.
 
 ### client.call(name[, params][, callback]) ###
-### client.call(name, callback) ###
+### client.call(name[, callback]) ###
 
-Call an RPC method named `name` with `params`. `callback` will be called with `(err, result)`.
-Returns an instance of `RPCClientResult` which currently only exposes one method, `setTimeout(timeout)`,
-which can be used to set the timeout on the call.
+Call an RPC method named `name` with `params`. `callback` will be called with
+`(err, result)`. Returns an instance of `RPCClientResult` which can be used as a
+promise but also exposes `setTimeout(timeout)`, which can be used to set the
+timeout on the call, and `abort()`, which can be used to abort the request.

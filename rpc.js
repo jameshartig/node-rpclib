@@ -3,9 +3,9 @@ var util = require('util'),
     http = require('http'),
     url = require('url'),
     bufferConcatLimit = require("buffer-concat-limit"),
+    log = require('levenlabs-log'),
     _EMPTY_OBJECT_ = {},
     debug;
-debug = util.debuglog('rpclib');
 
 function RPCLib() {
     this.methods = {};
@@ -71,6 +71,7 @@ RPCLib.prototype.addMethod = function(name, handler, params, flags) {
     if (errors !== undefined && typeof errors !== 'object') {
         throw new TypeError('Invalid error sent to addMethod for ' + name);
     }
+    log.debug('rpclib: added method', {name: name});
     this.methods[name] = {
         params: params,
         handler: handler,
@@ -83,6 +84,7 @@ RPCLib.prototype.addMethod = function(name, handler, params, flags) {
 
 RPCLib.prototype.removeMethod = function(name) {
     if (this.methods.hasOwnProperty(name)) {
+        log.debug('rpclib: removing method', {name: name});
         delete this.methods[name];
     }
 };
@@ -95,26 +97,28 @@ RPCLib.prototype.setPreProcessor = function(func) {
     if (typeof func !== 'function') {
         throw new TypeError('Invalid function sent to setPreProcessor');
     }
+    log.debug('rpclib: adding preProcessor');
     this.preProcessor = func;
 };
 
-RPCLib.prototype.handleRequest = function(requestBody, httpResponse) {
-    debug('handleRequest');
+RPCLib.prototype.handleRequest = function(requestBody, httpResponse, originalReq) {
+    log.debug('rpclib: new request', {ip: originalReq ? originalReq.remoteAddress : undefined});
     var message = null,
         i = 0,
         responseGroup;
     try {
         message = JSON.parse(requestBody);
     } catch (e) {
-        debug('JSON Error', e);
+        log.warn('rpclib: JSON error when parsing body', e);
+        // continue since _processRequest will handle invalid body
     }
     if (Array.isArray(message)) {
         responseGroup = new RPCResponseGroup(httpResponse);
         for (i = 0; i < message.length; i++) {
-            this._processRequest(message[i], httpResponse, responseGroup);
+            this._processRequest(message[i], httpResponse, responseGroup, originalReq);
         }
     } else {
-        this._processRequest(message, httpResponse);
+        this._processRequest(message, httpResponse, null, originalReq);
     }
 };
 
@@ -143,12 +147,12 @@ function endResponse(respObj, response) {
     return respObj;
 }
 
-function callHandler(handler, params, response, request) {
-    debug('Calling handler for', request.method);
-    handler(params, response);
+function callHandler(handler, params, response, request, originalReq) {
+    log.debug('rpclib: calling handler', {method: request.method});
+    handler(params, response, originalReq);
 }
 
-RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup) {
+RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup, originalReq) {
     var response = new RPCResponse(httpResponse),
         methodDetail = null,
         k = '',
@@ -163,7 +167,7 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
     }
 
     if (typeof request !== 'object' || request === null) {
-        debug('Invalid json received');
+        log.warn('rpclib: invalid json received');
         response.reject(RPCLib.ERROR_PARSE_ERROR);
         return;
     }
@@ -172,17 +176,17 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
         response._setMessageID(request.id);
     }
     if (request.jsonrpc !== '2.0') {
-        debug('Invalid jsonrpc value received');
+        log.warn('rpclib: invalid jsonrpc value', {value: request.jsonrpc});
         response.reject(RPCLib.ERROR_INVALID_REQUEST);
         return;
     }
     if (typeof request.method !== 'string') {
-        debug('Invalid method value received');
+        log.warn('rpclib: invalid method value', {value: request.method});
         response.reject(RPCLib.ERROR_INVALID_REQUEST);
         return;
     }
     if ((typeof request.params !== 'object' && request.params !== undefined) || request.params === null) {
-        debug('Invalid params value received');
+        log.warn('rpclib: invalid params value', {value: request.params});
         response.reject(RPCLib.ERROR_INVALID_REQUEST);
         return;
     }
@@ -196,7 +200,7 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
 
     methodDetail = this.methods[request.method];
     if (methodDetail === undefined) {
-        debug('Method', request.method, 'doesnt exist');
+        log.warn('rpclib: method does not exist', {method: request.method});
         response.reject(RPCLib.ERROR_INVALID_METHOD, {method: request.method});
         return false;
     }
@@ -215,7 +219,7 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
                 t = 'array';
             }
             if (v.type !== '*' && t !== v.type && (!v.optional || t !== 'undefined')) {
-                debug('Method', request.method, 'requires param \"' + k + '" to be type', v, 'was', t);
+                log.warn('rpclib: method received invalid param', {method: request.method, param: k, type: t});
                 response.reject(RPCLib.ERROR_INVALID_PARAMS, {param: k, expectedType: v.type, sentType: t});
                 return;
             }
@@ -229,29 +233,29 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
 
     try {
         if (this.preProcessor !== null && methodDetail.internal !== true) {
-            debug('Calling preProcessor');
-            dfd = this.preProcessor(request, response, methodDetail.flags);
+            log.debug('rpclib: calling preProcessor', {method: request.method});
+            dfd = this.preProcessor(request, response, methodDetail.flags, originalReq);
             //if they returned a dfd wait until its done before calling handler
             if (dfd && typeof dfd.then === 'function') {
                 //call done so it throws if there's an error but we're not guranateed everything will support done >_<
                 dfd[typeof dfd.done === 'function' ? 'done' : 'then'](function() {
                     if (response.resolved) {
-                        debug('preProcessor resolved response');
+                        log.debug('rpclib: preProcessor resolved response', {method: request.method});
                         return;
                     }
-                    callHandler(methodDetail.handler, params, response, request);
+                    callHandler(methodDetail.handler, params, response, request, originalReq);
                 });
                 return;
             }
             if (response.resolved) {
-                debug('preProcessor resolved response');
+                log.debug('rpclib: preProcessor resolved response', {method: request.method});
                 return;
             }
         }
 
-        callHandler(methodDetail.handler, params, response, request);
+        callHandler(methodDetail.handler, params, response, request, originalReq);
     } catch (e) {
-        debug('Error from handler/preProcessor call', e);
+        log.error('rpclib: error from handler/preProcessor', {method: request.method, error: e});
         response.reject(RPCLib.ERROR_INTERNAL_ERROR);
         throw e;
     }
@@ -292,13 +296,11 @@ function respondError(errorCode, errorMessage, id, errorData) {
 
 function respondResult(res, id) {
     //don't allow undefined since that would result in the result key missing from json
-    var result = res !== undefined ? res : null,
-        resp = {
-            jsonrpc: '2.0',
-            result: result,
-            id: id
-        };
-    return resp;
+    return {
+        jsonrpc: '2.0',
+        result: res !== undefined ? res : null,
+        id: id
+    };
 }
 
 function callAlways(response) {
@@ -368,7 +370,7 @@ RPCResponse.prototype.get = function(name) {
     return this.keyVals[name];
 };
 RPCResponse.prototype.resolve = function(result) {
-    debug('RPCResponse resolved');
+    log.debug('rpclib: RPCResponse resolved');
     this.resolved = true;
     this.result = respondResult(result, this._messageID);
     callAlways(this);
@@ -387,7 +389,7 @@ RPCResponse.prototype.reject = function(errorCode, errorMsg, data) {
         errorMessage = this._predefinedErrors[errorCode];
     }
 
-    debug('RPCResponse rejected with code', errorCode);
+    log.debug('rpclib: RPCResponse rejected', {code: errorCode});
     this.resolved = true;
     this.result = respondError(errorCode, errorMessage, this._messageID, errorData);
     callAlways(this);
@@ -409,7 +411,7 @@ function RPCResponseEnd(message) {
     if (!this._httpResponse || this._httpResponse.ended) {
         return;
     }
-    debug('Ending RPCResponse');
+    log.debug('rpclib: ending RPCResponse');
     var response = null;
     if (typeof this._httpResponse.setHeader === 'function') {
         this._httpResponse.setHeader('Content-Type', 'application/json');
@@ -427,7 +429,7 @@ function RPCResponseEnd(message) {
         this._httpResponse.end(response);
     } catch (e) {
         //this will most likely only happen when the httpResponse was already closed on the client side
-        debug('Failed to end httpResponse', e);
+        log.warn('rpclib: failed to end httpResponse', e);
     }
 }
 RPCResponse.prototype.end = RPCResponseEnd;
@@ -458,15 +460,19 @@ RPCResponseGroup.prototype.add = function(response, rpc) {
 };
 RPCResponseGroup.prototype.end = RPCResponseEnd;
 
-function RPCClientResult(httpReq, resolve) {
+function RPCClientResult(httpReq, resolve, promise) {
     if (!httpReq || typeof httpReq.abort !== 'function') {
         throw new TypeError('Invalid httpReq sent to RPCClientResult');
     }
     if (typeof resolve !== 'function') {
         throw new TypeError('Invalid resolve sent to RPCClientResult');
     }
+    if (!promise || typeof promise.then !== 'function') {
+        throw new TypeError('Invalid promise sent to RPCClientResult');
+    }
     this._httpReq = httpReq;
     this._resolve = resolve;
+    this._promise = promise;
     this.ended = false;
     this.timer = null;
     httpReq.once('response', function() {
@@ -491,7 +497,7 @@ RPCClientResult.prototype.setTimeout = function(timeout) {
                 this.timer = null;
                 return;
             }
-            debug('RPCClientResult timed out');
+            log.warn('rpclib: clientResult timed out');
             this.abort();
             this._resolve({
                 type: 'timeout',
@@ -503,7 +509,7 @@ RPCClientResult.prototype.setTimeout = function(timeout) {
     return this;
 };
 RPCClientResult.prototype.abort = function() {
-    debug('abort RPCClientResult');
+    log.debug('rpclib: clientResult abort');
     if (!this.ended) {
         this._httpReq.removeAllListeners('response');
         this._httpReq.abort();
@@ -515,6 +521,12 @@ RPCClientResult.prototype.abort = function() {
     }
     return this;
 };
+RPCClientResult.prototype.then = function(res, cat) {
+    return this._promise.then(res, cat);
+};
+RPCClientResult.prototype.catch = function(cat) {
+    return this._promise.catch(cat);
+};
 
 function RPCClient(endpoint) {
     if (endpoint) {
@@ -523,7 +535,6 @@ function RPCClient(endpoint) {
 }
 RPCClient.prototype.url = null;
 RPCClient.prototype.setEndpoint = function(endpoint) {
-    debug('setEndpoint', endpoint);
     this.url = url.parse(endpoint);
     if (!this.url || !this.url.host) {
         throw new TypeError('Invalid url sent to RPCClient');
@@ -534,15 +545,45 @@ RPCClient.prototype.call = function(name, params, callback) {
         callback = params;
         params = null;
     }
-    if (typeof callback !== 'function') {
+    if (callback && typeof callback !== 'function') {
         throw new TypeError('callback sent to RPCClient.call must be a function');
     }
     if (this.url === null) {
         throw new TypeError('RPC endpoint not defined. Must call setEndpoint or sent endpoint to constructor');
     }
 
-    debug('call method:', name);
-    var postData = JSON.stringify({
+    log.debug('rpclib: client call', {method: name});
+    var promiseResolve = function(res) {
+            resolvedRes = res;
+        },
+        promiseReject = function(err) {
+            rejectedErr = err;
+        },
+        ourResolve = function(err, res) {
+            if (err) {
+                promiseReject(err);
+            } else {
+                promiseResolve(res);
+            }
+            if (callback) {
+                var cb = callback;
+                callback = null;
+                cb(err, res);
+            }
+        },
+        clientResult = null,
+        promise = new Promise(function(resolve, reject) {
+            promiseResolve = resolve;
+            promiseReject = reject;
+            // if we already resolved before this ever ran... call
+            // resolve/reject now
+            if (resolvedRes !== undefined) {
+                resolve(resolvedRes);
+            } else if (rejectedErr !== undefined) {
+                reject(rejectedErr);
+            }
+        }.bind(this)),
+        postData = JSON.stringify({
             jsonrpc: '2.0',
             method: name,
             params: params || {},
@@ -558,26 +599,23 @@ RPCClient.prototype.call = function(name, params, callback) {
                 'Content-Length': Buffer.byteLength(postData)
             }
         },
-        resolve = function(err, res) {
-            if (callback === null) {
-                return;
-            }
-            var cb = callback;
-            callback = null;
-            cb(err, res);
-        },
-        req, clientResult;
+        resolvedRes, rejectedErr, req;
 
     req = http.request(reqOptions, function(result) {
-        debug('Received result for call', result.statusCode);
+        log.debug('rpclib: client call result', {
+            method: name,
+            status: result.statusCode
+        });
         function onClose() {
-            resolve({
+            log.warn('rpclib: client server returned no body', {method: name});
+            ourResolve({
                 type: 'http',
                 statusCode: result.statusCode,
                 code: RPCLib.ERROR_SERVER_ERROR,
                 message: 'Server returned no body'
             }, null);
         }
+
         var bufferedData = null;
         result.on('data', function(data) {
             if (bufferedData === null) {
@@ -596,8 +634,12 @@ RPCClient.prototype.call = function(name, params, callback) {
                 rpcResult = JSON.parse(bufferedData) || {};
                 //todo: verify jsonrpc version
             } catch (e) {
-                debug('Error parsing json response from call', e, '\nResponse:', bufferedData.toString());
-                resolve({
+                log.warn('rpclib: client received invalid json', {
+                    method: name,
+                    error: e,
+                    body: bufferedData.toString()
+                });
+                ourResolve({
                     type: 'json',
                     statusCode: result.statusCode,
                     code: RPCLib.ERROR_SERVER_ERROR,
@@ -605,7 +647,7 @@ RPCClient.prototype.call = function(name, params, callback) {
                 }, null);
                 return;
             }
-            resolve(rpcResult.error || null, rpcResult.result || null);
+            ourResolve(rpcResult.error || null, rpcResult.result || null);
         });
         result.once('close', onClose);
     });
@@ -614,7 +656,11 @@ RPCClient.prototype.call = function(name, params, callback) {
         if (clientResult && clientResult.ended) {
             return;
         }
-        resolve({
+        log.warn('rpclib: client received error', {
+            method: name,
+            error: err
+        });
+        ourResolve({
             type: 'http',
             socketError: err,
             code: 0,
@@ -623,7 +669,8 @@ RPCClient.prototype.call = function(name, params, callback) {
     });
     req.write(postData);
     req.end();
-    clientResult = new RPCClientResult(req, resolve);
+
+    clientResult = new RPCClientResult(req, ourResolve, promise);
     return clientResult;
 };
 

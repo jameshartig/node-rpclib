@@ -115,10 +115,12 @@ exports.addMethodNullParams = function(test) {
 exports.handleTestRequest = function(test) {
     var rpc = new RPCLib(),
         called = false,
-        ended = false;
-    rpc.addMethod('test', function(params, response) {
+        ended = false,
+        originalReq = {};
+    rpc.addMethod('test', function(params, response, httpReq) {
         test.equal(typeof params, 'object');
         test.equal(params.test, 'test');
+        test.strictEqual(httpReq, originalReq);
         called = true;
         response.resolve({success: true});
     }, {
@@ -131,7 +133,7 @@ exports.handleTestRequest = function(test) {
             ended = true;
         },
         ended: false
-    });
+    }, originalReq);
     test.ok(called);
     test.ok(ended);
     test.done();
@@ -282,14 +284,21 @@ exports.handleEndThrowing = function(test) {
 
 exports.preProcessor = function(test) {
     var rpc = new RPCLib(),
-        called = false;
+        called = false,
+        originalReq = {};
     rpc.addMethod('test', function() {}, {}, 9);
-    rpc.setPreProcessor(function(req, resp, flags) {
+    rpc.setPreProcessor(function(req, resp, flags, httpReq) {
         test.equal(req.method, 'test');
         test.strictEqual(flags, 9);
+        test.strictEqual(httpReq, originalReq);
         called = true;
     });
-    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}));
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}), {
+        end: function() {
+            throw new Error('Broke');
+        },
+        ended: false
+    }, originalReq);
     test.ok(called);
     test.done();
 };
