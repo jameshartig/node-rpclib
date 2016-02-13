@@ -2,10 +2,9 @@ var util = require('util'),
     assert = require('assert'),
     http = require('http'),
     url = require('url'),
-    bufferConcatLimit = require("buffer-concat-limit"),
+    bufferConcatLimit = require('buffer-concat-limit'),
     log = require('levenlabs-log'),
-    _EMPTY_OBJECT_ = {},
-    debug;
+    _EMPTY_OBJECT_ = {};
 
 function RPCLib() {
     this.methods = {};
