@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "buffer-concat-limit": "^0.0.1",
-    "levenlabs-log": "^0.1.1"
+    "modulelog": "^0.2.2"
   },
   "scripts": {
     "test": "nodeunit tests"

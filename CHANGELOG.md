@@ -1,5 +1,9 @@
 ## Changelog ##
 
+### 0.3.1 ###
+* Use modulelog instead of levenlabs-log
+* Accept `http.IncomingMessage` in call
+
 ### 0.3.0 ###
 * Return promise in client
 * Switch to levenlabs-log

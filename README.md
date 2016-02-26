@@ -61,12 +61,14 @@ Handles a request from a client. `requestBody` should the body of the request ma
 should be an instance of `http.IncomingMessage` if this call orginated from an
 http request.
 
-### rpc.call(method, [, params][, callback]) ###
-### rpc.call(method, callback) ###
+### rpc.call(method[, params][, callback][, httpRequest]) ###
+### rpc.call(method, callback[, httpRequest]) ###
 
 Calls a method added by `addMethod` and sends along the passed params. `callback` is
 called with `result`, which is the full JSON object (containing a `result` or `error`
-key) that would've been sent in response to an HTTP request.
+key) that would've been sent in response to an HTTP request. If this was called
+in response to a HTTP request, it should be passed as `httpRequest` so methods can
+get IP and other information from that request.
 
 ## RPCResponse Methods ##
 

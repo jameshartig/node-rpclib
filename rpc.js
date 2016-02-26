@@ -3,7 +3,7 @@ var util = require('util'),
     http = require('http'),
     url = require('url'),
     bufferConcatLimit = require('buffer-concat-limit'),
-    log = require('levenlabs-log'),
+    log = require('modulelog')('rpclib'),
     _EMPTY_OBJECT_ = {};
 
 function RPCLib() {
@@ -121,8 +121,11 @@ RPCLib.prototype.handleRequest = function(requestBody, httpResponse, originalReq
     }
 };
 
-RPCLib.prototype.call = function(name, params, callback) {
+RPCLib.prototype.call = function(name, params, callback, httpRequest) {
     if (typeof params === 'function') {
+        if (callback) {
+            httpRequest = callback;
+        }
         callback = params;
         params = null;
     }
@@ -134,7 +137,7 @@ RPCLib.prototype.call = function(name, params, callback) {
         method: name,
         params: params || {},
         id: 1
-    }, callback);
+    }, callback, null, httpRequest);
 };
 
 function endResponse(respObj, response) {
