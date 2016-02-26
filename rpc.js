@@ -377,14 +377,14 @@ RPCResponse.prototype.resolve = function(result) {
 RPCResponse.prototype.reject = function(errorCode, errorMsg, data) {
     var errorData = data,
         errorMessage;
-    if (arguments.length === 2 && typeof errorMsg === 'object') {
+    if (arguments.length === 2 && typeof errorMsg === 'object' && errorMsg !== null) {
         errorData = errorMsg;
         errorMessage = undefined;
     } else {
         errorMessage = errorMsg;
     }
     //!= null handles null and undefined
-    if (errorMessage === undefined && this._predefinedErrors != null) {
+    if (errorMessage == null && this._predefinedErrors != null) {
         errorMessage = this._predefinedErrors[errorCode];
     }
 

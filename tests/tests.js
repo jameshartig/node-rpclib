@@ -231,6 +231,34 @@ exports.handleTestRequestDefaultMessage = function(test) {
     test.done();
 };
 
+exports.handleTestRequestDefaultMessageNull = function(test) {
+    var rpc = new RPCLib(),
+        ended = false;
+    rpc.addMethod('test', {
+        handler: function(params, response) {
+            response.reject(1, null);
+        },
+        params: {},
+        errors: {
+            1: 'test message'
+        }
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({
+                jsonrpc: '2.0',
+                error: {code: 1, message: 'test message'},
+                id: 1
+            }));
+            this.ended = true;
+            ended = true;
+        },
+        ended: false
+    });
+    test.ok(ended);
+    test.done();
+};
+
 exports.handleTestRequestOptions = function(test) {
     var rpc = new RPCLib(),
         called = false;
@@ -436,10 +464,12 @@ exports.setHeaderToJSON = function(test) {
 };
 
 exports.callTest = function(test) {
-    var rpc = new RPCLib();
-    rpc.addMethod('test', function(params, response) {
+    var rpc = new RPCLib(),
+        origReq = {};
+    rpc.addMethod('test', function(params, response, httpReq) {
         test.equal(typeof params, 'object');
         test.equal(params.test, 'test');
+        test.strictEqual(origReq, origReq);
         response.resolve({success: true});
     }, {
         test: {type: 'string', optional: false}
@@ -448,7 +478,7 @@ exports.callTest = function(test) {
         test.notEqual(result.result, null);
         test.equal(result.result.success, true);
         test.done();
-    });
+    }, origReq);
 };
 
 exports.callTestInvalidParams = function(test) {
