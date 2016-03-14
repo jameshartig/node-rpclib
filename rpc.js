@@ -13,6 +13,7 @@ function RPCLib() {
         handler: this._describeSelfHandler.bind(this),
         internal: true
     });
+    this.config = {};
 }
 
 RPCLib.ERROR_PARSE_ERROR = -32700;
@@ -98,6 +99,27 @@ RPCLib.prototype.setPreProcessor = function(func) {
     }
     log.debug('rpclib: adding preProcessor');
     this.preProcessor = func;
+};
+
+RPCLib.prototype.setConfigValue = function(key, value) {
+    this.config[key] = value;
+};
+
+RPCLib.prototype.getConfig = function() {
+    var temp = this.config.constructor();
+    for (var key in this.config) {
+        if (this.config.hasOwnProperty(key)) {
+            temp[key] = this.config[key];
+        }
+    }
+    return temp;
+};
+
+RPCLib.prototype.getConfigValue = function(key) {
+    if (this.config.hasOwnProperty(key)) {
+        return this.config[key];
+    }
+    return undefined;
 };
 
 RPCLib.prototype.handleRequest = function(requestBody, httpResponse, originalReq) {
