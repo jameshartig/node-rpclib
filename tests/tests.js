@@ -548,3 +548,22 @@ exports.callTestResolveUndefined = function(test) {
         test.done();
     });
 };
+
+exports.setOptionsValue = function(test) {
+    var rpc = new RPCLib(),
+        obj = {};
+    rpc.setConfigValue('test', obj);
+    test.strictEqual(rpc.getConfigValue('test'), obj);
+    test.strictEqual(rpc.getConfigValue('test2'), undefined);
+    rpc.setConfigValue('test', null);
+    test.strictEqual(rpc.getConfigValue('test'), null);
+    test.done();
+};
+
+exports.getConfig = function(test) {
+    var rpc = new RPCLib();
+    rpc.setConfigValue('test', true);
+    test.notStrictEqual(rpc.getConfig(), rpc.config);
+    test.strictEqual(rpc.getConfig().test, true);
+    test.done();
+}
