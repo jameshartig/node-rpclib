@@ -1,5 +1,8 @@
 ## Changelog ##
 
+### 0.3.2 ###
+* Added configuration values
+
 ### 0.3.1 ###
 * Use modulelog instead of levenlabs-log
 * Accept `http.IncomingMessage` in call
