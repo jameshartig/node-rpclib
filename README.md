@@ -130,6 +130,15 @@ Creates a new RPC client instance. `endpoint` should be a url.
 ### client.call(name[, callback])
 
 Call an RPC method named `name` with `params`. `callback` will be called with
-`(err, result)`. Returns an instance of `RPCClientResult` which can be used as a
-promise but also exposes `setTimeout(timeout)`, which can be used to set the
-timeout on the call, and `abort()`, which can be used to abort the request.
+`(err, result)`. Returns an instance of `RPCClientResult`.
+
+## RPCClientResult Methods ##
+
+`RPCClientResult` has `then` and `catch` methods and behaves like a promise.
+Additionally...
+
+### call.setTimeout(ms) ###
+
+timeout the call after `ms` milliseconds. The callback passed to `call` will
+get passed an error with a `type` of `timeout` after the timeout has passed and
+`catch` functions will be called.
