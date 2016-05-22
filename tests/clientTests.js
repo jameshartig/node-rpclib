@@ -91,22 +91,30 @@ exports.brokenURL = function(test) {
 };
 
 exports.setTimeout = function(test) {
-    test.expect(3);
+    test.expect(2);
     var clientRes;
     clientRes = client.call('wait', {timeout: 200}, function(err) {
         test.strictEqual(err.code, 0);
         test.equal(err.type, 'timeout');
-        test.ok(clientRes._httpReq.aborted > 0);
+        test.done();
+    }).setTimeout(100);
+};
+
+exports.setTimeoutPromise = function(test) {
+    test.expect(2);
+    var clientRes;
+    clientRes = client.call('wait', {timeout: 200}).catch(function(err) {
+        test.strictEqual(err.code, 0);
+        test.equal(err.type, 'timeout');
         test.done();
     }).setTimeout(100);
 };
 
 exports.setTimeoutZero = function(test) {
-    test.expect(2);
+    test.expect(1);
     var clientRes;
     clientRes = client.call('wait', {timeout: 200}, function(err, res) {
         test.ok(res && res.done);
-        test.ok(!clientRes._httpReq.aborted);
         test.done();
     }).setTimeout(100).setTimeout(0);
 };

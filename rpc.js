@@ -4,6 +4,7 @@ var util = require('util'),
     url = require('url'),
     bufferConcatLimit = require('buffer-concat-limit'),
     log = require('modulelog')('rpclib'),
+    noop = function() {},
     _EMPTY_OBJECT_ = {};
 
 function RPCLib() {
@@ -467,8 +468,8 @@ function RPCResponseGroup(httpResponse) {
     this._resolvedCount = 0;
 }
 RPCResponseGroup.prototype.add = function(response, rpc) {
-    var f = function(respObj, response) {
-            if (!response._silent) {
+    var f = function(respObj, resp) {
+            if (!resp._silent) {
                 this.results.push(JSON.stringify(respObj));
             }
             this._resolvedCount++;
@@ -484,73 +485,45 @@ RPCResponseGroup.prototype.add = function(response, rpc) {
 };
 RPCResponseGroup.prototype.end = RPCResponseEnd;
 
-function RPCClientResult(httpReq, resolve, promise) {
-    if (!httpReq || typeof httpReq.abort !== 'function') {
-        throw new TypeError('Invalid httpReq sent to RPCClientResult');
-    }
-    if (typeof resolve !== 'function') {
-        throw new TypeError('Invalid resolve sent to RPCClientResult');
-    }
+function RPCClientResult(errFn, promise) {
     if (!promise || typeof promise.then !== 'function') {
         throw new TypeError('Invalid promise sent to RPCClientResult');
     }
-    this._httpReq = httpReq;
-    this._resolve = resolve;
-    this._promise = promise;
-    this.ended = false;
+    this.errFn = errFn || noop;
     this.timer = null;
-    httpReq.once('response', function() {
-        this.ended = true;
-        if (this.timer !== null) {
-            clearTimeout(this.timer);
-            this.timer = null;
-        }
-    }.bind(this));
+    this._promise = promise;
 }
 RPCClientResult.prototype.setTimeout = function(timeout) {
-    if (this.ended) {
-        return this;
-    }
     if (this.timer !== null) {
         clearTimeout(this.timer);
         this.timer = null;
     }
     if (timeout > 0) {
         this.timer = setTimeout(function() {
-            if (this.ended) {
-                this.timer = null;
-                return;
-            }
-            log.warn('rpclib: clientResult timed out');
-            this.abort();
-            this._resolve({
+            this.timer = null;
+            // this matches node-rpclib
+            this.errFn({
                 type: 'timeout',
                 code: 0,
                 message: 'Timed out waiting for response'
-            }, null);
+            });
         }.bind(this), timeout);
     }
     return this;
 };
 RPCClientResult.prototype.abort = function() {
-    log.debug('rpclib: clientResult abort');
-    if (!this.ended) {
-        this._httpReq.removeAllListeners('response');
-        this._httpReq.abort();
-        this.ended = true;
-    }
-    if (this.timer !== null) {
-        clearTimeout(this.timer);
-        this.timer = null;
-    }
+    this.errFn(null);
     return this;
 };
 RPCClientResult.prototype.then = function(res, cat) {
-    return this._promise.then(res, cat);
+    this._promise = this._promise.then(res, cat);
+    return this;
 };
 RPCClientResult.prototype.catch = function(cat) {
-    return this._promise.catch(cat);
+    this._promise = this._promise.catch(cat);
+    return this;
 };
+RPCLib.RPCClientResult = RPCClientResult;
 
 function RPCClient(endpoint) {
     if (endpoint) {
@@ -563,11 +536,43 @@ RPCClient.prototype.setEndpoint = function(endpoint) {
     if (!this.url || !this.url.host) {
         throw new TypeError('Invalid url sent to RPCClient');
     }
+    if (!this.url.port) {
+        this.url.port = (this.url.protocol === 'https' ? '443' : '80');
+    }
 };
-RPCClient.prototype.call = function(name, params, callback) {
-    if (typeof params === 'function') {
-        callback = params;
-        params = null;
+
+RPCClient.prototype.call = function(name, methodParams, cb) {
+    var callback = cb,
+        client = this,
+        params = {
+            jsonrpc: '2.0',
+            method: name,
+            params: _EMPTY_OBJECT_,
+            id: Date.now()
+        },
+        postData = '',
+        reqOptions = {
+            hostname: (this.url && this.url.hostname) || '',
+            port: (this.url && this.url.port) || '80',
+            path: (this.url && this.url.path) || '/',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': 0
+            }
+
+        },
+        ended = false,
+        existingError = null,
+        promiseReject = noop,
+        clientResult = null,
+        httpReq = null;
+
+    if (typeof methodParams === 'function') {
+        callback = methodParams;
+        params.params = _EMPTY_OBJECT_;
+    } else if (methodParams) {
+        params.params = methodParams;
     }
     if (callback && typeof callback !== 'function') {
         throw new TypeError('callback sent to RPCClient.call must be a function');
@@ -577,124 +582,141 @@ RPCClient.prototype.call = function(name, params, callback) {
     }
 
     log.debug('rpclib: client call', {method: name});
-    var promiseResolve = function(res) {
-            resolvedRes = res;
-        },
-        promiseReject = function(err) {
-            rejectedErr = err;
-        },
-        ourResolve = function(err, res) {
-            if (err) {
-                promiseReject(err);
-            } else {
-                promiseResolve(res);
-            }
-            if (callback) {
-                var cb = callback;
-                callback = null;
-                cb(err, res);
-            }
-        },
-        clientResult = null,
-        promise = new Promise(function(resolve, reject) {
-            promiseResolve = resolve;
-            promiseReject = reject;
-            // if we already resolved before this ever ran... call
-            // resolve/reject now
-            if (resolvedRes !== undefined) {
-                resolve(resolvedRes);
-            } else if (rejectedErr !== undefined) {
-                reject(rejectedErr);
-            }
-        }.bind(this)),
-        postData = JSON.stringify({
-            jsonrpc: '2.0',
-            method: name,
-            params: params || {},
-            id: Date.now()
-        }),
-        reqOptions = {
-            hostname: this.url.hostname,
-            port: this.url.port || (this.url.protocol === 'https' ? '443' : '80'),
-            path: this.url.path || '/',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(postData)
-            }
-        },
-        resolvedRes, rejectedErr, req;
 
-    req = http.request(reqOptions, function(result) {
-        log.debug('rpclib: client call result', {
-            method: name,
-            status: result.statusCode
-        });
-        function onClose() {
-            log.warn('rpclib: client server returned no body', {method: name});
-            ourResolve({
-                type: 'http',
-                statusCode: result.statusCode,
-                code: RPCLib.ERROR_SERVER_ERROR,
-                message: 'Server returned no body'
-            }, null);
+    postData = JSON.stringify(params);
+    reqOptions.headers['Content-Length'] = Buffer.byteLength(postData);
+
+    function onEnd() {
+        ended = true;
+        if (clientResult) {
+            // this will clear the timeout
+            clientResult.setTimeout(0);
+            clientResult = null;
         }
+    }
 
-        var bufferedData = null;
-        result.on('data', function(data) {
-            if (bufferedData === null) {
-                bufferedData = data;
-                return;
-            }
-            bufferedData = bufferConcatLimit(bufferedData, data);
-        });
-        result.once('end', function() {
-            if (bufferedData === null) {
-                onClose();
-                return;
-            }
-            var rpcResult = null;
-            try {
-                rpcResult = JSON.parse(bufferedData) || {};
-                //todo: verify jsonrpc version
-            } catch (e) {
-                log.warn('rpclib: client received invalid json', {
-                    method: name,
-                    error: e,
-                    body: bufferedData.toString()
-                });
-                ourResolve({
-                    type: 'json',
-                    statusCode: result.statusCode,
-                    code: RPCLib.ERROR_SERVER_ERROR,
-                    message: 'Server returned invalid JSON'
-                }, null);
-                return;
-            }
-            ourResolve(rpcResult.error || null, rpcResult.result || null);
-        });
-        result.once('close', onClose);
-    });
-    req.on('error', function(err) {
-        //if the clientResult already ended then it must be a timeout or an abort
-        if (clientResult && clientResult.ended) {
+    function errFn(err) {
+        if (httpReq) {
+            httpReq.abort();
+            httpReq = null;
+        }
+        if (err) {
+            existingError = err;
+            promiseReject(err);
+        } else {
+            onEnd();
+        }
+    }
+
+    function promiseHandler(resolve, reject) {
+        if (ended) {
             return;
         }
-        log.warn('rpclib: client received error', {
-            method: name,
-            error: err
-        });
-        ourResolve({
-            type: 'http',
-            socketError: err,
-            code: 0,
-            message: 'Failed to reach server'
-        }, null);
-    });
-    req.write(postData);
-    req.end();
+        if (existingError) {
+            reject(existingError);
+            return;
+        }
+        promiseReject = reject;
 
-    clientResult = new RPCClientResult(req, ourResolve, promise);
+        httpReq = http.request(reqOptions, function(result) {
+            if (ended) {
+                httpReq.abort();
+                return;
+            }
+            log.debug('rpclib: client call result', {
+                method: name,
+                status: result.statusCode
+            });
+            function onClose() {
+                if (ended) {
+                    return;
+                }
+                log.warn('rpclib: client server returned no body', { method: name });
+                reject({
+                    type: 'http',
+                    statusCode: result.statusCode,
+                    code: RPCLib.ERROR_SERVER_ERROR,
+                    message: 'Server returned no body'
+                });
+            }
+
+            var bufferedData = null;
+            result.on('data', function (data) {
+                if (bufferedData === null) {
+                    bufferedData = data;
+                    return;
+                }
+                bufferedData = bufferConcatLimit(bufferedData, data);
+            });
+            result.once('end', function() {
+                if (bufferedData === null) {
+                    onClose();
+                    return;
+                }
+                var rpcResult = null;
+                try {
+                    rpcResult = JSON.parse(bufferedData) || {};
+                    if (rpcResult.jsonrpc !== '2.0') {
+                        throw new Error('invalid jsonrpc version: ' + rpcResult.jsonrpc);
+                    }
+                } catch (e) {
+                    log.warn('rpclib: client received invalid json', {
+                        method: name,
+                        error: e,
+                        body: bufferedData.toString()
+                    });
+                } finally {
+                    if (rpcResult && rpcResult.error) {
+                        reject(rpcResult.error);
+                    } else if (!rpcResult || !rpcResult.hasOwnProperty('result')) {
+                        reject({
+                            type: 'json',
+                            statusCode: result.statusCode,
+                            code: RPCLib.ERROR_SERVER_ERROR,
+                            message: 'Server returned invalid JSON'
+                        });
+                    } else {
+                        resolve(rpcResult.result);
+                    }
+                }
+            });
+            result.once('close', onClose);
+        });
+        httpReq.on('error', function(err) {
+            // if already ended then it must be a timeout or an abort
+            if (ended) {
+                return;
+            }
+            log.warn('rpclib: client received error', {
+                method: name,
+                error: err
+            });
+            reject({
+                type: 'http',
+                socketError: err,
+                code: 0,
+                message: 'Failed to reach server'
+            });
+        });
+        httpReq.write(postData);
+        httpReq.end();
+    }
+
+    var promise = new Promise(promiseHandler).then(function(res) {
+        onEnd();
+        if (callback) {
+            callback(null, res);
+        }
+        return res;
+    }, function(err) {
+        onEnd();
+        if (callback) {
+            callback(err, null);
+        }
+        throw err;
+    });
+
+    clientResult = new RPCClientResult(errFn, promise);
     return clientResult;
 };
 

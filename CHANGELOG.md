@@ -1,5 +1,9 @@
 ## Changelog ##
 
+### 0.4.0 ###
+* Rewritten handler in call
+* Fixed promise-like RPCClientResult
+
 ### 0.3.2 ###
 * Added configuration values
 
@@ -10,7 +14,7 @@
 ### 0.3.0 ###
 * Return promise in client
 * Switch to levenlabs-log
-* Pass long original `http.IncomingMessage`
+* Pass along original `http.IncomingMessage`
 
 ### 0.2.2 ###
 * Added helpful data to the error `data` when method is invalid or params are invalid
