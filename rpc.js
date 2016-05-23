@@ -260,20 +260,30 @@ RPCLib.prototype._processRequest = function(request, httpResponse, responseGroup
         if (this.preProcessor !== null && methodDetail.internal !== true) {
             log.debug('rpclib: calling preProcessor', {method: request.method});
             dfd = this.preProcessor(request, response, methodDetail.flags, originalReq);
-            //if they returned a dfd wait until its done before calling handler
+            if (response.resolved) {
+                log.debug('rpclib: preProcessor resolved response', {method: request.method});
+                return;
+            }
+            // if they returned a dfd wait until its done before calling handler
             if (dfd && typeof dfd.then === 'function') {
-                //call done so it throws if there's an error but we're not guranateed everything will support done >_<
+                // call done so it throws if there's an error but we're not guranateed everything will support done >_<
                 dfd[typeof dfd.done === 'function' ? 'done' : 'then'](function() {
                     if (response.resolved) {
-                        log.debug('rpclib: preProcessor resolved response', {method: request.method});
+                        log.debug('rpclib: preProcessor resolved response before then', {method: request.method});
                         return;
                     }
                     callHandler(methodDetail.handler, params, response, request, originalReq);
                 });
-                return;
-            }
-            if (response.resolved) {
-                log.debug('rpclib: preProcessor resolved response', {method: request.method});
+                if (typeof dfd.catch === 'function') {
+                    dfd.catch(function(err) {
+                        if (response.resolved) {
+                            log.debug('rpclib: preProcessor resolved response before catch', {method: request.method});
+                            return;
+                        }
+                        log.error('rpclib: error from handler/preProcessor', {method: request.method, error: err});
+                        response.reject(RPCLib.ERROR_INTERNAL_ERROR);
+                    });
+                }
                 return;
             }
         }

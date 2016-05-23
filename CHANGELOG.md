@@ -3,6 +3,7 @@
 ### 0.4.0 ###
 * Rewritten handler in call
 * Fixed promise-like RPCClientResult
+* Handle catch from preProcessor
 
 ### 0.3.2 ###
 * Added configuration values

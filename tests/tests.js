@@ -379,49 +379,87 @@ exports.preProcessorResolvedDeferred = function(test) {
     test.done();
 };
 
-exports.invalidJSON = function(test) {
+exports.preProcessorRejected = function(test) {
+    test.expect(2);
     var rpc = new RPCLib(),
-        ended = false;
+        called = false;
+    rpc.addMethod('test', function() {
+        called = true;
+    });
+    rpc.setPreProcessor(function(req, resp) {
+        return new Promise(function(resolve, reject) {
+            reject();
+        });
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: -32603, message: 'Internal error'}, id: 1}));
+            this.ended = true;
+            test.equal(called, false);
+            test.done();
+        },
+        ended: false
+    });
+};
+
+exports.preProcessorRejectedResolved = function(test) {
+    test.expect(2);
+    var rpc = new RPCLib(),
+        called = false;
+    rpc.addMethod('test', function() {
+        called = true;
+    });
+    rpc.setPreProcessor(function(req, resp) {
+        return new Promise(function(resolve, reject) {
+            resp.resolve(1);
+            reject();
+        });
+    });
+    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}), {
+        end: function(str) {
+            test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', result: 1, id: 1}));
+            this.ended = true;
+            test.equal(called, false);
+            test.done();
+        },
+        ended: false
+    });
+};
+
+exports.invalidJSON = function(test) {
+    var rpc = new RPCLib();
     rpc.handleRequest('blahblahblah', {
         end: function(str) {
             test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: -32700, message: 'Parse error'}, id: null}));
             this.ended = true;
-            ended = true;
+            test.done();
         },
         ended: false
     });
-    test.ok(ended);
-    test.done();
 };
 
 exports.invalidRPCVersion = function(test) {
-    var rpc = new RPCLib(),
-        ended = false;
+    var rpc = new RPCLib();
     rpc.handleRequest(JSON.stringify({method: 'test', params: {}}), {
         end: function(str) {
             test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: -32600, message: 'Invalid Request'}, id: null}));
             this.ended = true;
-            ended = true;
+            test.done();
         },
         ended: false
     });
-    test.ok(ended);
-    test.done();
 };
 
 exports.invalidRPCVersionID = function(test) {
-    var rpc = new RPCLib(),
-        ended = false;
+    var rpc = new RPCLib();
     rpc.handleRequest(JSON.stringify({method: 'test', params: {}, id: 1}), {
         end: function(str) {
             test.strictEqual(str, JSON.stringify({jsonrpc: '2.0', error: {code: -32600, message: 'Invalid Request'}, id: 1}));
             this.ended = true;
-            ended = true;
+            test.done();
         },
         ended: false
     });
-    test.ok(ended);
-    test.done();
 };
 
 exports.missingParams = function(test) {
