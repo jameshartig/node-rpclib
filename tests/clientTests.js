@@ -2,7 +2,7 @@ var http = require('http'),
     RPCLib = require('../rpc.js'),
     rpc = new RPCLib(),
     listenOptions = {port: 14999, host: '127.0.0.1'},
-    httpPath = 'http://' + listenOptions.host + ':' + listenOptions.port,
+    httpPath = 'http://' + listenOptions.host + ':' + listenOptions.port + '/',
     client = new RPCLib.RPCClient(httpPath),
     listening = false, server;
 
@@ -48,11 +48,12 @@ exports.callSimple = function(test) {
 };
 
 exports.callPromise = function(test) {
-    test.expect(1);
-    client.call('test', {test: 'test'}).then(function(res) {
+    test.expect(2);
+    var result = client.call('test', {test: 'test'}).then(function(res) {
         test.equal(res.test, 'test');
         test.done();
     });
+    test.equal(result.clientURL, httpPath);
 };
 
 exports.callNoParams = function(test) {

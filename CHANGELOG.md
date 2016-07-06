@@ -1,5 +1,8 @@
 ## Changelog ##
 
+### 0.4.1 ###
+* Added clientURL to RPCClientResult
+
 ### 0.4.0 ###
 * Rewritten handler in call
 * Fixed promise-like RPCClientResult

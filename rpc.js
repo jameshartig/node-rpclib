@@ -1,7 +1,6 @@
-var util = require('util'),
-    assert = require('assert'),
+var assert = require('assert'),
     http = require('http'),
-    url = require('url'),
+    urlClass = require('url'),
     bufferConcatLimit = require('buffer-concat-limit'),
     log = require('modulelog')('rpclib'),
     noop = function() {},
@@ -124,7 +123,7 @@ RPCLib.prototype.getConfigValue = function(key) {
 };
 
 RPCLib.prototype.handleRequest = function(requestBody, httpResponse, originalReq) {
-    log.debug('rpclib: new request', {ip: originalReq ? originalReq.remoteAddress : undefined});
+    log.debug('rpclib: new request', {ip: (originalReq && (originalReq.remoteAddress || (originalReq.socket && originalReq.socket.remoteAddress)))});
     var message = null,
         i = 0,
         responseGroup;
@@ -502,6 +501,7 @@ function RPCClientResult(errFn, promise) {
     this.errFn = errFn || noop;
     this.timer = null;
     this._promise = promise;
+    this.clientURL = '';
 }
 RPCClientResult.prototype.setTimeout = function(timeout) {
     if (this.timer !== null) {
@@ -542,7 +542,7 @@ function RPCClient(endpoint) {
 }
 RPCClient.prototype.url = null;
 RPCClient.prototype.setEndpoint = function(endpoint) {
-    this.url = url.parse(endpoint);
+    this.url = urlClass.parse(endpoint);
     if (!this.url || !this.url.host) {
         throw new TypeError('Invalid url sent to RPCClient');
     }
@@ -727,6 +727,7 @@ RPCClient.prototype.call = function(name, methodParams, cb) {
     });
 
     clientResult = new RPCClientResult(errFn, promise);
+    clientResult.clientURL = urlClass.format(this.url);
     return clientResult;
 };
 

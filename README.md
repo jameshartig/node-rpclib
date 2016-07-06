@@ -137,8 +137,13 @@ Call an RPC method named `name` with `params`. `callback` will be called with
 `RPCClientResult` has `then` and `catch` methods and behaves like a promise.
 Additionally...
 
-### call.setTimeout(ms) ###
+### res.setTimeout(ms) ###
 
 timeout the call after `ms` milliseconds. The callback passed to `call` will
 get passed an error with a `type` of `timeout` after the timeout has passed and
 `catch` functions will be called.
+
+### res.clientURL ###
+
+Read-only property to get the URL that the request is going to. Useful for
+logging.
