@@ -1,5 +1,4 @@
-var Deferred = require('deferred'),
-    RPCLib = require('../rpc.js');
+var RPCLib = require('../rpc.js');
 
 exports.createRPC = function(test) {
     var rpc = new RPCLib();
@@ -345,36 +344,38 @@ exports.preProcessorResolved = function(test) {
     test.done();
 };
 
-exports.preProcessorDeferred = function(test) {
+exports.preProcessorPromise = function(test) {
     var rpc = new RPCLib(),
-        dfd = new Deferred(),
-        called = false;
+        called = false,
+        p;
     rpc.addMethod('test', function() {
         called = true;
+        test.done();
     });
     rpc.setPreProcessor(function() {
-        return dfd.promise;
+        return p;
     });
-    rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}));
-    test.equal(called, false);
-    dfd.resolve();
-    test.equal(called, true);
-    test.done();
+    p = new Promise(function(resolve) {
+        // give time for us to get the promise
+        setTimeout(function() {
+            rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}));
+            test.equal(called, false);
+            resolve();
+        }, 10);
+    });
 };
 
-exports.preProcessorResolvedDeferred = function(test) {
+exports.preProcessorResolvedPromise = function(test) {
     var rpc = new RPCLib(),
-        dfd = new Deferred(),
         called = false;
     rpc.addMethod('test', function() {
         called = true;
     });
     rpc.setPreProcessor(function(req, resp) {
         resp.resolve();
-        return dfd.promise;
+        return Promise.resolve();
     });
     rpc.handleRequest(JSON.stringify({jsonrpc: '2.0', method: 'test', params: {}, id: 1}));
-    dfd.resolve();
     test.equal(called, false);
     test.done();
 };
