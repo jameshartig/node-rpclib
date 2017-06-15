@@ -551,9 +551,10 @@ RPCClient.prototype.setEndpoint = function(endpoint) {
     }
 };
 
-RPCClient.prototype.call = function(name, methodParams, cb) {
+RPCClient.prototype.call = function(name, methodParams, cb, opts) {
     var callback = cb,
         client = this,
+        options = opts || {},
         params = {
             jsonrpc: '2.0',
             method: name,
@@ -570,13 +571,20 @@ RPCClient.prototype.call = function(name, methodParams, cb) {
                 'Content-Type': 'application/json',
                 'Content-Length': 0
             }
-
         },
         ended = false,
         existingError = null,
         promiseReject = noop,
         clientResult = null,
         httpReq = null;
+
+    if (options && options.headers) {
+        for (var k in options.headers) {
+            if (options.headers.hasOwnProperty(k)) {
+                reqOptions.headers[k] = options.headers[k];
+            }
+        }
+    }
 
     if (typeof methodParams === 'function') {
         callback = methodParams;

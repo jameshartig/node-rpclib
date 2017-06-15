@@ -1,5 +1,8 @@
 ## Changelog ##
 
+### 0.4.1 ###
+* Added options to call so you can send an object with extra headers
+
 ### 0.4.0 ###
 * Rewritten handler in call
 * Fixed promise-like RPCClientResult

@@ -14,11 +14,15 @@ rpc.addMethod('wait', function(params, response) {
     setTimeout(function() {
         response.resolve({done: true});
     }, params.timeout);
-}, {timeout: 'number'});
+}, { timeout: 'number' });
+
+rpc.addMethod('headers', function (params, response, req) {
+    response.resolve(req.headers);
+}, {});
 
 server = http.createServer(function(req, res) {
     req.on('data', function(body) {
-        rpc.handleRequest(body.toString(), res);
+        rpc.handleRequest(body.toString(), res, req);
     });
 });
 
@@ -45,6 +49,15 @@ exports.callSimple = function(test) {
         test.equal(res.test, 'test');
         test.done();
     });
+};
+
+exports.callHeaders = function (test) {
+    test.expect(2);
+    client.call('headers', { }, function (err, res) {
+        test.strictEqual(err, null);
+        test.equal(res['x-test'], 'test');
+        test.done();
+    }, { headers: { 'X-Test': 'test' } });
 };
 
 exports.callPromise = function(test) {
